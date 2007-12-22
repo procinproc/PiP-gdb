@@ -1,0 +1,59 @@
+# Copyright 2007 Free Software Foundation, Inc.
+
+# This program is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation; either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+# Please email any bugs, comments, and/or additions to this file to:
+# bug-gdb@gnu.org
+
+# This file is part of the gdb testsuite.
+
+# Test basis recognization of DW_TAG_interface_type.
+# GCC java_classify_record() produces it if returns RECORD_IS_INTERFACE.
+
+if {![istarget "i?86-*-*"] && ![istarget "x86_64-*-*"]} then {
+    verbose "Skipping i386 Java DW_TAG_interface_type test."
+    return
+}
+
+set testfile "i386-interface"
+set srcfile ${testfile}.S
+set binfile ${objdir}/${subdir}/${testfile}.o
+
+if { [gdb_compile "${srcdir}/${subdir}/${srcfile}" "${binfile}" object {debug additional_flags=-m32}] != "" } {
+    untested i386-gnu-cfi.exp
+    return -1
+}
+
+# Get things started.
+
+gdb_exit
+gdb_start
+gdb_reinitialize_dir $srcdir/$subdir
+gdb_load ${binfile}
+
+gdb_test "set language java"
+
+set test "ptype Interface"
+gdb_test_multiple $test $test {
+    -re "type = class Interface  *extends java.lang.Object \{.*$gdb_prompt $" {
+	pass $test
+    }
+}
+
+set test "ptype Class"
+gdb_test_multiple $test $test {
+    -re "type = class Class  *extends java.lang.Object implements Interface \{.*$gdb_prompt $" {
+	pass $test
+    }
+}
