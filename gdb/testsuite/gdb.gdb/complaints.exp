@@ -251,13 +251,13 @@ proc find_gdb { arg } {
 set GDB_FULLPATH [find_gdb $GDB]
 
 # Remove any old copy lying around.
-remote_file host delete x$tool
+#remote_file host delete x$tool
 
 gdb_start
 
-set file [remote_download host $GDB_FULLPATH x$tool]
+#set file [remote_download host $GDB_FULLPATH x$tool]
 
-set setup_result [setup_test $file ]
+set setup_result [setup_test $GDB_FULLPATH ]
 if {$setup_result <0} then {
     return -1
 }
@@ -268,4 +268,4 @@ test_short_complaints
 test_empty_complaints
 
 gdb_exit;
-catch "remote_file host delete $file";
+#catch "remote_file host delete $file";

@@ -253,13 +253,13 @@ proc find_gdb { arg } {
 set GDB_FULLPATH [find_gdb $GDB]
 
 # Remove any old copy lying around.
-remote_file host delete x$tool
+#remote_file host delete x$tool
 
 gdb_start
-set file [remote_download host $GDB_FULLPATH x$tool]
-set result [test_observer $file];
+#set file [remote_download host $GDB_FULLPATH x$tool]
+set result [test_observer $GDB_FULLPATH];
 gdb_exit;
-catch "remote_file host delete $file";
+#catch "remote_file host delete $file";
 
 if {$result <0} then {
     warning "Couldn't test self"
