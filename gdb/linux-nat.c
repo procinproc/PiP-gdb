@@ -4647,10 +4647,15 @@ linux_xfer_partial (struct target_ops *ops, enum target_object object,
 	offset &= ((ULONGEST) 1 << addr_bit) - 1;
     }
 
+#ifndef NATIVE_XFER_UNWIND_TABLE
+  /* FIXME: For ia64, we cannot currently use linux_proc_xfer_memory
+	    for accessing thread storage.  Revert when Bugzilla 147436
+	    is fixed.  */
   xfer = linux_proc_xfer_partial (ops, object, annex, readbuf, writebuf,
 				  offset, len);
   if (xfer != 0)
     return xfer;
+#endif
 
   return super_xfer_partial (ops, object, annex, readbuf, writebuf,
 			     offset, len);
