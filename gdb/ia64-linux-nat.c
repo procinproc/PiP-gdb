@@ -865,6 +865,64 @@ ia64_linux_status_is_event (int status)
 
 void _initialize_ia64_linux_nat (void);
 
+/*
+ * Note: taken from ia64_tdep.c
+ *
+ */
+
+static __inline__ unsigned long
+ia64_rse_slot_num (unsigned long addr)
+{
+  return (addr >> 3) & 0x3f;
+}
+
+/* Skip over a designated number of registers in the backing
+   store, remembering every 64th position is for NAT.  */
+static __inline__ unsigned long
+ia64_rse_skip_regs (unsigned long  addr, long num_regs)
+{
+  long delta = ia64_rse_slot_num(addr) + num_regs;
+
+  if (num_regs < 0)
+    delta -= 0x3e;
+  return addr + ((num_regs + delta/0x3f) << 3);
+}
+
+/*
+ * Check mem_region is stack or not. If stack, /proc/<pid>/mem cannot return 
+ * expected value.
+ */
+int ia64_linux_check_stack_region(struct lwp_info *ti, struct mem_region *range)
+{
+	CORE_ADDR addr;
+	int error;
+	unsigned long bsp, cfm, bspstore;
+	long sof;
+	pid_t pid = ptid_get_lwp(ti->ptid);
+	bsp = ptrace(PTRACE_PEEKUSER, pid, PT_AR_BSP ,NULL);
+	if (bsp == (unsigned long)-1) {
+		return 1;
+	}
+	/* stack is allocated by one-segment, not separated into several segments.
+	   So, we only have to check whether bsp is in *range* or not. */ 		
+	if((range->lo <= bsp) && (bsp <= range->hi)) {
+		bspstore = ptrace(PTRACE_PEEKUSER, pid, PT_AR_BSPSTORE, NULL);
+		cfm = ptrace(PTRACE_PEEKUSER, pid, PT_CFM, NULL);
+		sof = cfm & 0x3f;
+		bsp = ia64_rse_skip_regs(bsp, -sof);
+		range->lo = bspstore;
+		range->hi = bsp;
+		/* we have to check the size of dirty register stack area */
+		/*
+		fprintf_unfiltered(gdb_stdlog, "<%d> <%p>  <%lx> <%p> <%p>\n",
+				   pid, bsp, sof, range->lo, range->hi);
+		*/
+		return 1;
+	}
+	
+	return 0;
+}
+
 void
 _initialize_ia64_linux_nat (void)
 {

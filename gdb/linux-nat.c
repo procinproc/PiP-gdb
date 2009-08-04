@@ -4647,15 +4647,38 @@ linux_xfer_partial (struct target_ops *ops, enum target_object object,
 	offset &= ((ULONGEST) 1 << addr_bit) - 1;
     }
 
-#ifndef NATIVE_XFER_UNWIND_TABLE
-  /* FIXME: For ia64, we cannot currently use linux_proc_xfer_memory
-	    for accessing thread storage.  Revert when Bugzilla 147436
-	    is fixed.  */
   xfer = linux_proc_xfer_partial (ops, object, annex, readbuf, writebuf,
 				  offset, len);
   if (xfer != 0)
-    return xfer;
+    {
+#ifdef NATIVE_XFER_UNWIND_TABLE
+      struct mem_region range;
+      range.lo = memaddr;
+      range.hi = memaddr + len;
+
+      /* FIXME: For ia64, we cannot currently use
+	 linux_proc_xfer_partial for accessing rse register storage.
+	 Revert when Bugzilla 147436 is fixed.  */
+#ifdef NATIVE_XFER_UNWIND_TABLE
+      extern int ia64_linux_check_stack_region (struct lwp_info *lwp,
+						void *range);
 #endif
+      if (iterate_over_lwps (ia64_linux_check_stack_region, &range) != NULL)
+	{ /* This region contains ia64 rse registers, we have to re-read.  */
+	  int xxfer;
+
+	  /* Re-read register stack area.  */
+	  xxfer = super_xfer_partial (ops, object, annex,
+				      readbuf + (range.lo - memaddr),
+				      writebuf + (range.lo - memaddr),
+				      offset + (range.lo - memaddr),
+				      range.hi - range.lo);
+	  if (xxfer == 0)
+	    xfer = 0;
+	}
+#endif
+      return xfer;
+    }
 
   return super_xfer_partial (ops, object, annex, readbuf, writebuf,
 			     offset, len);
