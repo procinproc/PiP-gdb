@@ -5572,8 +5572,13 @@ Packet: '%s'\n"),
 	      VEC_safe_push (cached_reg_t, event->regcache, &cached_reg);
 	    }
 
+	  /* It may also occur on amd64 which defaults to 32-bit i386
+	     target.  gdbserver(1) is not aware of the `set architecture'
+	     name itself as it is not using libbfd.  */
 	  if (*p != ';')
-	    error (_("Remote register badly formatted: %s\nhere: %s"),
+	    error (_("Remote register badly formatted: %s\nhere: %s"
+		     "\nTry to load the executable by `file' first,"
+		     "\nyou may also check `set/show architecture'."),
 		   buf, p);
 	  ++p;
 	}
