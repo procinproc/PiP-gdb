@@ -666,7 +666,7 @@ solib_used (const struct so_list *const known)
    processes we've just attached to, so that's okay.  */
 
 static void
-update_solib_list (int from_tty, struct target_ops *target)
+update_solib_list_1 (int from_tty, struct target_ops *target)
 {
   struct target_so_ops *ops = solib_ops (target_gdbarch ());
   struct so_list *inferior = ops->current_sos();
@@ -837,6 +837,21 @@ Do you need \"set solib-search-path\" or \"set sysroot\"?"),
     }
 }
 
+/* Wrapper for Fedora: gdb-core-open-vdso-warning.patch  */
+
+static void
+update_solib_list (int from_tty, struct target_ops *target)
+{
+  struct so_list *saved_so_list_head = so_list_head;
+
+  update_solib_list_1 (from_tty, target);
+
+  /* If this was the very first DSO list scan and we possibly read in ld.so
+     recheck all the formerly unreadable DSO names strings.  */
+
+  if (saved_so_list_head == NULL && so_list_head != NULL)
+    update_solib_list_1 (from_tty, target);
+}
 
 /* Return non-zero if NAME is the libpthread shared library.
 

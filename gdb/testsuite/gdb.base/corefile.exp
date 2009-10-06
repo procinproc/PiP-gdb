@@ -286,3 +286,19 @@ if {$buildid == ""} {
     gdb_test "info files" "Local exec file:\r\n\[ \t\]*`[string_to_regexp $debugdir/$buildid]', file type .*"
     pass $wholetest
 }
+
+
+# Test Linux specific vDSO warning:
+# warning: Can't read pathname for load map: Input/output error.
+
+clean_restart ${testfile}
+
+set test "core-file vdso warning"
+gdb_test_multiple "core-file $corefile" $test {
+    -re "warning: Can't read pathname for load map: Input/output error\\.\r\n.*\r\n$gdb_prompt $" {
+	fail $test
+    }
+    -re "\r\n$gdb_prompt $" {
+	pass $test
+    }
+}

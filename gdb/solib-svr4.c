@@ -1218,8 +1218,17 @@ svr4_read_so_list (CORE_ADDR lm, struct so_list ***link_ptr_ptr,
 			  SO_NAME_MAX_PATH_SIZE - 1, &errcode);
       if (errcode != 0)
 	{
-	  warning (_("Can't read pathname for load map: %s."),
-		   safe_strerror (errcode));
+	  /* During the first ever DSO list reading some strings may be
+	     unreadable as residing in the ld.so readonly memory not being
+	     present in a dumped core file.  Delay the error check after
+	     the first pass of DSO list scanning when ld.so should be
+	     already mapped in and all the DSO list l_name memory gets
+	     readable.  */
+
+	  if (master_so_list () != NULL)
+	    warning (_("Can't read pathname for load map: %s."),
+		     safe_strerror (errcode));
+
 	  do_cleanups (old_chain);
 	  continue;
 	}
