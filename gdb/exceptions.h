@@ -90,6 +90,9 @@ enum errors {
      aborted as the inferior state is no longer valid.  */
   TARGET_CLOSE_ERROR,
 
+  /* Attempt to load a core file as executable.  */
+  IS_CORE_ERROR,
+
   /* Add more errors here.  */
   NR_ERRORS
 };

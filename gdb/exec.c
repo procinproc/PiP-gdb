@@ -34,6 +34,7 @@
 #include "gdbthread.h"
 #include "progspace.h"
 #include "gdb_bfd.h"
+#include "exceptions.h"
 
 #include <fcntl.h>
 #include "readline/readline.h"
@@ -254,12 +255,27 @@ exec_file_attach (char *filename, int from_tty)
 
       if (!bfd_check_format_matches (exec_bfd, bfd_object, &matching))
 	{
+	  int is_core;
+
+	  /* If the user accidentally did "gdb core", print a useful
+	     error message.  Check it only after bfd_object has been checked as
+	     a valid executable may get recognized for example also as
+	     "trad-core".  */
+	  is_core = bfd_check_format (exec_bfd, bfd_core);
+
 	  /* Make sure to close exec_bfd, or else "run" might try to use
 	     it.  */
 	  exec_close ();
-	  error (_("\"%s\": not in executable format: %s"),
-		 scratch_pathname,
-		 gdb_bfd_errmsg (bfd_get_error (), matching));
+
+	  if (is_core != 0)
+	    throw_error (IS_CORE_ERROR,
+		   _("\"%s\" is a core file.\n"
+		     "Please specify an executable to debug."),
+		   scratch_pathname);
+	  else
+	    error (_("\"%s\": not in executable format: %s"),
+		   scratch_pathname,
+		   gdb_bfd_errmsg (bfd_get_error (), matching));
 	}
 
       /* FIXME - This should only be run for RS6000, but the ifdef is a poor
