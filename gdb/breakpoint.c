@@ -12568,6 +12568,8 @@ update_global_location_list (int should_insert)
 		 traps we can no longer explain.  */
 
 	      old_loc->events_till_retirement = 3 * (thread_count () + 1);
+	      /* Red Hat Bug 590623.  */
+	      old_loc->events_till_retirement *= 10;
 	      old_loc->owner = NULL;
 
 	      VEC_safe_push (bp_location_p, moribund_locations, old_loc);
