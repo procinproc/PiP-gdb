@@ -688,7 +688,7 @@ holding the child stopped.  Try \"set detach-on-fork\" or \
 	      remove_breakpoints_pid (GET_PID (inferior_ptid));
 	    }
 
-	  if (info_verbose || debug_linux_nat)
+	  if (1 /* Fedora Bug 235197 */ || info_verbose || debug_linux_nat)
 	    {
 	      target_terminal_ours ();
 	      fprintf_filtered (gdb_stdlog,
