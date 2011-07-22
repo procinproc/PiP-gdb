@@ -3731,7 +3731,8 @@ retry:
      threads can be a bit time-consuming so if we want decent
      performance with heavily multi-threaded programs, especially when
      they're using a high frequency timer, we'd better avoid it if we
-     can.  */
+     can.  For possible trap signals like SIGTRAP and SIGILL, don't
+     avoid reporting.  */
 
   if (WIFSTOPPED (status))
     {
