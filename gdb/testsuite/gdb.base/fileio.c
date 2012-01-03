@@ -58,6 +58,8 @@ system (const char * string);
 1) Invalid string/command. -  returns 127.  */
 static const char *strerrno (int err);
 
+#define ROOTSUBDIR "fileio.dir"
+
 #define FILENAME    "foo.fileio.test"
 #define RENAMED     "bar.fileio.test"
 #define NONEXISTANT "nofoo.fileio.test"
@@ -542,6 +544,37 @@ strerrno (int err)
 int
 main ()
 {
+  /* ROOTSUBDIR is already prepared by fileio.exp.  We use it for easy cleanup
+     (by fileio.exp) if we are run by multiple users in the same directory.  */
+
+  if (chdir (ROOTSUBDIR) != 0)
+    {
+      printf ("chdir " ROOTSUBDIR ": %s\n", strerror (errno));
+      exit (1);
+    }
+
+  /* These tests
+       Open for write but no write permission returns EACCES
+       Unlinking a file in a directory w/o write access returns EACCES
+     fail if we are being run as root - drop the privileges here.  */
+
+  if (geteuid () == 0)
+    {
+      uid_t uid = 99;
+
+      if (chown (".", uid, uid) != 0)
+	{
+	  printf ("chown %d.%d " ROOTSUBDIR ": %s\n", (int) uid, (int) uid,
+		  strerror (errno));
+	  exit (1);
+	}
+      if (setuid (uid) || geteuid () == 0)
+	{
+	  printf ("setuid %d: %s\n", (int) uid, strerror (errno));
+	  exit (1);
+	}
+    }
+
   /* Don't change the order of the calls.  They partly depend on each other */
   test_open ();
   test_write ();

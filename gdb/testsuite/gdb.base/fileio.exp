@@ -37,8 +37,8 @@ if [get_compiler_info] {
     return -1;
 }
 
-remote_exec build {sh -xc test\ -r\ dir2.fileio.test\ &&\ chmod\ -f\ +w\ dir2.fileio.test}
-remote_exec build {sh -xc rm\ -rf\ *.fileio.test}
+remote_exec build {sh -xc rm\ -rf\ fileio.dir}
+remote_exec build {sh -xc mkdir\ -m777\ fileio.dir}
 
 set oldtimeout $timeout
 set timeout [expr "$timeout + 60"]
@@ -80,7 +80,7 @@ gdb_test continue \
 
 gdb_test "continue" ".*" ""
 
-catch "system \"chmod -f -w nowrt.fileio.test\""
+catch "system \"chmod -f -w fileio.dir/nowrt.fileio.test\""
 
 gdb_test continue \
 "Continuing\\..*open 5:.*EACCES$stop_msg" \
@@ -246,8 +246,8 @@ gdb_exit
 # Wait till GDB really exits.
 sleep 1
 
-remote_exec build {sh -xc test\ -r\ dir2.fileio.test\ &&\ chmod\ -f\ +w\ dir2.fileio.test}
-remote_exec build {sh -xc rm\ -rf\ *.fileio.test}
+remote_exec build {sh -xc test\ -r\ fileio.dir/dir2.fileio.test\ &&\ chmod\ -f\ +w\ fileio.dir/dir2.fileio.test}
+remote_exec build {sh -xc rm\ -rf\ fileio.dir}
 
 set timeout $oldtimeout
 return 0
