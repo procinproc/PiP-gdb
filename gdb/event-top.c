@@ -952,6 +952,11 @@ set_async_editing_command (char *args, int from_tty,
 void
 gdb_setup_readline (void)
 {
+  /* 6.2 regression: no longed asks for --more--
+     gdb.base/readline-ask.exp
+     https://bugzilla.redhat.com/show_bug.cgi?id=701131  */
+  RL_SETSTATE (RL_STATE_FEDORA_GDB);
+
   /* This function is a noop for the sync case.  The assumption is
      that the sync setup is ALL done in gdb_init, and we would only
      mess it up here.  The sync stuff should really go away over
