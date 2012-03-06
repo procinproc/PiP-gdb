@@ -69,5 +69,6 @@ struct buffer;
 
 extern void linux_ptrace_attach_warnings (pid_t pid, struct buffer *buffer);
 extern void linux_ptrace_init_warnings (void);
+extern void linux_ptrace_create_warnings (struct buffer *buffer);
 
 #endif /* COMMON_LINUX_PTRACE_H */

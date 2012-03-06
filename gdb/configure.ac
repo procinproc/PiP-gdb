@@ -2066,6 +2066,10 @@ then
 	      [Define if you support the personality syscall.])
 fi
 
+dnl Check security_get_boolean_active availability.
+AC_CHECK_HEADERS(selinux/selinux.h)
+AC_CHECK_LIB(selinux, security_get_boolean_active)
+
 dnl Handle optional features that can be enabled.
 
 # Support for --with-sysroot is a copy of GDB_AC_WITH_DIR,

@@ -104,7 +104,15 @@ static void
 inf_ptrace_me (void)
 {
   /* "Trace me, Dr. Memory!"  */
+  errno = 0;
   ptrace (PT_TRACE_ME, 0, (PTRACE_TYPE_ARG3)0, 0);
+  if (errno != 0)
+    {
+      fprintf_unfiltered (gdb_stderr, _("Cannot create process: %s\n"),
+			  safe_strerror (errno));
+      gdb_flush (gdb_stderr);
+      _exit (0177);
+    }
 }
 
 /* Start a new inferior Unix child process.  EXEC_FILE is the file to

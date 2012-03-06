@@ -29,6 +29,10 @@
 #include "gdb_assert.h"
 #include "gdb_wait.h"
 
+#ifdef HAVE_SELINUX_SELINUX_H
+# include <selinux/selinux.h>
+#endif /* HAVE_SELINUX_SELINUX_H */
+
 /* Find all possible reasons we could fail to attach PID and append these
    newline terminated reason strings to initialized BUFFER.  '\0' termination
    of BUFFER must be done by the caller.  */
@@ -48,6 +52,8 @@ linux_ptrace_attach_warnings (pid_t pid, struct buffer *buffer)
     buffer_xml_printf (buffer, _("warning: process %d is a zombie "
 				 "- the process has already terminated\n"),
 		       (int) pid);
+
+  linux_ptrace_create_warnings (buffer);
 }
 
 #if defined __i386__ || defined __x86_64__
@@ -235,4 +241,20 @@ linux_ptrace_init_warnings (void)
   warned = 1;
 
   linux_ptrace_test_ret_to_nx ();
+}
+
+/* Print all possible reasons we could fail to create a traced process.  */
+
+void
+linux_ptrace_create_warnings (struct buffer *buffer)
+{
+#ifdef HAVE_LIBSELINUX
+  /* -1 is returned for errors, 0 if it has no effect, 1 if PTRACE_ATTACH is
+     forbidden.  */
+  if (security_get_boolean_active ("deny_ptrace") == 1)
+    buffer_xml_printf (buffer,
+		       _("the SELinux boolean 'deny_ptrace' is enabled, "
+			 "you can disable this process attach protection by: "
+			 "(gdb) shell sudo setsebool deny_ptrace=0"));
+#endif /* HAVE_LIBSELINUX */
 }

@@ -606,6 +606,29 @@ add_lwp (ptid_t ptid)
   return lwp;
 }
 
+/* Execute PTRACE_TRACEME with error checking.  */
+
+static void
+linux_traceme (const char *program)
+{
+  int save_errno;
+  struct buffer buffer;
+
+  errno = 0;
+  if (ptrace (PTRACE_TRACEME, 0,
+	      (PTRACE_ARG3_TYPE) 0, (PTRACE_ARG4_TYPE) 0) == 0)
+    return;
+
+  save_errno = errno;
+  buffer_init (&buffer);
+  linux_ptrace_create_warnings (&buffer);
+  buffer_grow_str0 (&buffer, "");
+  fprintf (stderr, _("%sCannot trace created process %s: %s.\n"),
+	   buffer_finish (&buffer), program, strerror (save_errno));
+  fflush (stderr);
+  _exit (0177);
+}
+
 /* Start an inferior process and returns its pid.
    ALLARGS is a vector of program-name and args. */
 
@@ -646,7 +669,7 @@ linux_create_inferior (char *program, char **allargs)
 
   if (pid == 0)
     {
-      ptrace (PTRACE_TRACEME, 0, (PTRACE_ARG3_TYPE) 0, (PTRACE_ARG4_TYPE) 0);
+      linux_traceme (program);
 
 #ifndef __ANDROID__ /* Bionic doesn't use SIGRTMIN the way glibc does.  */
       signal (__SIGRTMIN + 1, SIG_DFL);
@@ -4603,7 +4626,7 @@ linux_tracefork_grandchild (void *arg)
 static int
 linux_tracefork_child (void *arg)
 {
-  ptrace (PTRACE_TRACEME, 0, (PTRACE_ARG3_TYPE) 0, (PTRACE_ARG4_TYPE) 0);
+  linux_traceme ("PTRACE_O_TRACEFORK test");
   kill (getpid (), SIGSTOP);
 
 #if !(defined(__UCLIBC__) && defined(HAS_NOMMU))

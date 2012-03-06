@@ -1557,6 +1557,7 @@ linux_nat_create_inferior (struct target_ops *ops,
 #ifdef HAVE_PERSONALITY
   int personality_orig = 0, personality_set = 0;
 #endif /* HAVE_PERSONALITY */
+  volatile struct gdb_exception ex;
 
   /* The fork_child mechanism is synchronous and calls target_wait, so
      we have to mask the async mode.  */
@@ -1581,7 +1582,10 @@ linux_nat_create_inferior (struct target_ops *ops,
   /* Make sure we report all signals during startup.  */
   linux_nat_pass_signals (0, NULL);
 
-  linux_ops->to_create_inferior (ops, exec_file, allargs, env, from_tty);
+  TRY_CATCH (ex, RETURN_MASK_ERROR)
+    {
+      linux_ops->to_create_inferior (ops, exec_file, allargs, env, from_tty);
+    }
 
 #ifdef HAVE_PERSONALITY
   if (personality_set)
@@ -1593,6 +1597,24 @@ linux_nat_create_inferior (struct target_ops *ops,
 		 safe_strerror (errno));
     }
 #endif /* HAVE_PERSONALITY */
+
+  if (ex.reason < 0)
+    {
+      struct buffer buffer;
+      char *message, *buffer_s;
+
+      message = xstrdup (ex.message);
+      make_cleanup (xfree, message);
+
+      buffer_init (&buffer);
+      linux_ptrace_create_warnings (&buffer);
+
+      buffer_grow_str0 (&buffer, "");
+      buffer_s = buffer_finish (&buffer);
+      make_cleanup (xfree, buffer_s);
+
+      throw_error (ex.error, "%s%s", buffer_s, message);
+    }
 }
 
 static void
