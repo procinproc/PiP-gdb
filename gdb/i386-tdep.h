@@ -219,6 +219,9 @@ struct gdbarch_tdep
   int (*i386_sysenter_record) (struct regcache *regcache);
   /* Parse syscall args.  */
   int (*i386_syscall_record) (struct regcache *regcache);
+
+  /* Detect OS dependent outermost frames; such as `clone'.  */
+  int (*outermost_frame_p) (struct frame_info *this_frame);
 };
 
 /* Floating-point registers.  */

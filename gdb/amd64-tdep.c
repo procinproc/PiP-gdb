@@ -2378,12 +2378,17 @@ amd64_frame_unwind_stop_reason (struct frame_info *this_frame,
 {
   struct amd64_frame_cache *cache =
     amd64_frame_cache (this_frame, this_cache);
+  struct gdbarch_tdep *tdep = gdbarch_tdep (get_frame_arch (this_frame));
 
   if (!cache->base_p)
     return UNWIND_UNAVAILABLE;
 
   /* This marks the outermost frame.  */
   if (cache->base == 0)
+    return UNWIND_OUTERMOST;
+
+  /* Detect OS dependent outermost frames; such as `clone'.  */
+  if (tdep->outermost_frame_p && tdep->outermost_frame_p (this_frame))
     return UNWIND_OUTERMOST;
 
   return UNWIND_NO_REASON;
@@ -2395,12 +2400,17 @@ amd64_frame_this_id (struct frame_info *this_frame, void **this_cache,
 {
   struct amd64_frame_cache *cache =
     amd64_frame_cache (this_frame, this_cache);
+  struct gdbarch_tdep *tdep = gdbarch_tdep (get_frame_arch (this_frame));
 
   if (!cache->base_p)
     return;
 
   /* This marks the outermost frame.  */
   if (cache->base == 0)
+    return;
+
+  /* Detect OS dependent outermost frames; such as `clone'.  */
+  if (tdep->outermost_frame_p && tdep->outermost_frame_p (this_frame))
     return;
 
   (*this_id) = frame_id_build (cache->base + 16, cache->pc);
