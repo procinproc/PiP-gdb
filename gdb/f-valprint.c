@@ -57,7 +57,7 @@ LONGEST f77_array_offset_tbl[MAX_FORTRAN_DIMS + 1][2];
 
 #define F77_DIM_BYTE_STRIDE(n) (f77_array_offset_tbl[n][0])
 
-int
+LONGEST
 f77_get_lowerbound (struct type *type)
 {
   f_object_address_data_valid_or_error (type);
@@ -68,7 +68,7 @@ f77_get_lowerbound (struct type *type)
   return TYPE_ARRAY_LOWER_BOUND_VALUE (type);
 }
 
-int
+LONGEST
 f77_get_upperbound (struct type *type)
 {
   f_object_address_data_valid_or_error (type);
@@ -92,8 +92,8 @@ f77_get_upperbound (struct type *type)
 static void
 f77_get_dynamic_length_of_aggregate (struct type *type)
 {
-  int upper_bound = -1;
-  int lower_bound = 1;
+  LONGEST upper_bound = -1;
+  LONGEST lower_bound = 1;
 
   /* Recursively go all the way down into a possibly multi-dimensional
      F77 array and get the bounds.  For simple arrays, this is pretty
@@ -128,7 +128,7 @@ f77_create_arrayprint_offset_tbl (struct type *type, struct ui_file *stream)
   struct type *tmp_type;
   LONGEST eltlen;
   int ndimen = 1;
-  int upper, lower;
+  LONGEST upper, lower;
 
   tmp_type = type;
 
