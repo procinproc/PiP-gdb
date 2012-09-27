@@ -644,7 +644,7 @@ default_value_from_register (struct type *type, int regnum,
 			     struct frame_info *frame)
 {
   struct gdbarch *gdbarch = get_frame_arch (frame);
-  int len = TYPE_LENGTH (type);
+  LONGEST len = TYPE_LENGTH (type);
   struct value *value = allocate_value (type);
 
   VALUE_LVAL (value) = lval_register;
@@ -677,10 +677,10 @@ void
 read_frame_register_value (struct value *value, struct frame_info *frame)
 {
   struct gdbarch *gdbarch = get_frame_arch (frame);
-  int offset = 0;
-  int reg_offset = value_offset (value);
+  LONGEST offset = 0;
+  LONGEST reg_offset = value_offset (value);
   int regnum = VALUE_REGNUM (value);
-  int len = TYPE_LENGTH (check_typedef (value_type (value)));
+  LONGEST len = TYPE_LENGTH (check_typedef (value_type (value)));
 
   gdb_assert (VALUE_LVAL (value) == lval_register);
 
@@ -695,7 +695,7 @@ read_frame_register_value (struct value *value, struct frame_info *frame)
   while (len > 0)
     {
       struct value *regval = get_frame_register_value (frame, regnum);
-      int reg_len = TYPE_LENGTH (value_type (regval)) - reg_offset;
+      LONGEST reg_len = TYPE_LENGTH (value_type (regval)) - reg_offset;
 
       if (value_optimized_out (regval))
 	{

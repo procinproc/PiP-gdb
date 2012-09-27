@@ -43,7 +43,7 @@ static void f77_create_arrayprint_offset_tbl (struct type *,
 					      struct ui_file *);
 static void f77_get_dynamic_length_of_aggregate (struct type *);
 
-int f77_array_offset_tbl[MAX_FORTRAN_DIMS + 1][2];
+LONGEST f77_array_offset_tbl[MAX_FORTRAN_DIMS + 1][2];
 
 /* Array which holds offsets to be applied to get a row's elements
    for a given array.  Array also holds the size of each subarray.  */
@@ -126,7 +126,7 @@ static void
 f77_create_arrayprint_offset_tbl (struct type *type, struct ui_file *stream)
 {
   struct type *tmp_type;
-  int eltlen;
+  LONGEST eltlen;
   int ndimen = 1;
   int upper, lower;
 
@@ -171,13 +171,13 @@ f77_create_arrayprint_offset_tbl (struct type *type, struct ui_file *stream)
 static void
 f77_print_array_1 (int nss, int ndimensions, struct type *type,
 		   const gdb_byte *valaddr,
-		   int embedded_offset, CORE_ADDR address,
+		   LONGEST embedded_offset, CORE_ADDR address,
 		   struct ui_file *stream, int recurse,
 		   const struct value *val,
 		   const struct value_print_options *options,
 		   int *elts)
 {
-  int i;
+  LONGEST i;
 
   if (nss != ndimensions)
     {
@@ -220,7 +220,7 @@ f77_print_array_1 (int nss, int ndimensions, struct type *type,
 
 static void
 f77_print_array (struct type *type, const gdb_byte *valaddr,
-		 int embedded_offset,
+		 LONGEST embedded_offset,
 		 CORE_ADDR address, struct ui_file *stream,
 		 int recurse,
 		 const struct value *val,
@@ -263,8 +263,9 @@ static const struct generic_val_print_decorations f_decorations =
    function; they are identical.  */
 
 void
-f_val_print (struct type *type, const gdb_byte *valaddr, int embedded_offset,
-	     CORE_ADDR address, struct ui_file *stream, int recurse,
+f_val_print (struct type *type, const gdb_byte *valaddr,
+	     LONGEST embedded_offset, CORE_ADDR address,
+	     struct ui_file *stream, int recurse,
 	     const struct value *original_value,
 	     const struct value_print_options *options)
 {
@@ -389,7 +390,7 @@ f_val_print (struct type *type, const gdb_byte *valaddr, int embedded_offset,
       fprintf_filtered (stream, "( ");
       for (index = 0; index < TYPE_NFIELDS (type); index++)
         {
-          int offset = TYPE_FIELD_BITPOS (type, index) / 8;
+	  LONGEST offset = TYPE_FIELD_BITPOS (type, index) / 8;
 
           val_print (TYPE_FIELD_TYPE (type, index), valaddr,
 		     embedded_offset + offset,

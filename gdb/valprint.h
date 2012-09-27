@@ -113,11 +113,11 @@ extern void maybe_print_array_index (struct type *index_type, LONGEST index,
                                      struct ui_file *stream,
 				     const struct value_print_options *);
 
-extern void val_print_array_elements (struct type *, const gdb_byte *, int,
+extern void val_print_array_elements (struct type *, const gdb_byte *, LONGEST,
 				      CORE_ADDR, struct ui_file *, int,
 				      const struct value *,
 				      const struct value_print_options *,
-				      unsigned int);
+				      ULONGEST);
 
 extern void val_print_type_code_int (struct type *, const gdb_byte *,
 				     struct ui_file *);
@@ -127,7 +127,7 @@ extern void val_print_type_code_flags (struct type *type,
 				       struct ui_file *stream);
 
 extern void val_print_scalar_formatted (struct type *,
-					const gdb_byte *, int,
+					const gdb_byte *, LONGEST,
 					const struct value *,
 					const struct value_print_options *,
 					int,
@@ -143,7 +143,7 @@ extern void print_decimal_chars (struct ui_file *, const gdb_byte *,
 				 unsigned int, enum bfd_endian);
 
 extern void print_hex_chars (struct ui_file *, const gdb_byte *,
-			     unsigned int, enum bfd_endian);
+			     ULONGEST, enum bfd_endian);
 
 extern void print_char_chars (struct ui_file *, struct type *,
 			      const gdb_byte *, unsigned int, enum bfd_endian);
@@ -188,7 +188,7 @@ struct generic_val_print_decorations
 
 
 extern void generic_val_print (struct type *type, const gdb_byte *valaddr,
-			       int embedded_offset, CORE_ADDR address,
+			       LONGEST embedded_offset, CORE_ADDR address,
 			       struct ui_file *stream, int recurse,
 			       const struct value *original_value,
 			       const struct value_print_options *options,
@@ -198,7 +198,7 @@ extern void generic_emit_char (int c, struct type *type, struct ui_file *stream,
 			       int quoter, const char *encoding);
 
 extern void generic_printstr (struct ui_file *stream, struct type *type, 
-			      const gdb_byte *string, unsigned int length, 
+			      const gdb_byte *string, ULONGEST length,
 			      const char *encoding, int force_ellipses,
 			      int quote_char, int c_style_terminator,
 			      const struct value_print_options *options);

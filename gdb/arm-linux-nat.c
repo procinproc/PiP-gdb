@@ -1073,7 +1073,7 @@ arm_linux_remove_hw_breakpoint (struct gdbarch *gdbarch,
 /* Are we able to use a hardware watchpoint for the LEN bytes starting at 
    ADDR?  */
 static int
-arm_linux_region_ok_for_hw_watchpoint (CORE_ADDR addr, int len)
+arm_linux_region_ok_for_hw_watchpoint (CORE_ADDR addr, LONGEST len)
 {
   const struct arm_linux_hwbp_cap *cap = arm_linux_get_hwbp_cap ();
   CORE_ADDR max_wp_length, aligned_addr;

@@ -1680,19 +1680,19 @@ insert_bits (unsigned int datum,
    BITS_BIG_ENDIAN is taken directly from gdbarch.  */
 
 static void
-copy_bitwise (gdb_byte *dest, unsigned int dest_offset_bits,
-	      const gdb_byte *source, unsigned int source_offset_bits,
-	      unsigned int bit_count,
+copy_bitwise (gdb_byte *dest, ULONGEST dest_offset_bits,
+	      const gdb_byte *source, ULONGEST source_offset,
+	      ULONGEST bit_count,
 	      int bits_big_endian)
 {
-  unsigned int dest_avail;
+  unsigned int dest_avail, source_offset_bits;
   int datum;
 
   /* Reduce everything to byte-size pieces.  */
   dest += dest_offset_bits / 8;
   dest_offset_bits %= 8;
-  source += source_offset_bits / 8;
-  source_offset_bits %= 8;
+  source += source_offset / 8;
+  source_offset_bits = source_offset % 8;
 
   dest_avail = 8 - dest_offset_bits % 8;
 
@@ -1730,13 +1730,13 @@ static void
 read_pieced_value (struct value *v)
 {
   int i;
-  long offset = 0;
+  LONGEST offset = 0;
   ULONGEST bits_to_skip;
   gdb_byte *contents;
   struct piece_closure *c
     = (struct piece_closure *) value_computed_closure (v);
   struct frame_info *frame = frame_find_by_id (VALUE_FRAME_ID (v));
-  size_t type_len;
+  ULONGEST type_len;
   size_t buffer_size = 0;
   char *buffer = NULL;
   struct cleanup *cleanup;
@@ -1763,8 +1763,8 @@ read_pieced_value (struct value *v)
   for (i = 0; i < c->n_pieces && offset < type_len; i++)
     {
       struct dwarf_expr_piece *p = &c->pieces[i];
-      size_t this_size, this_size_bits;
-      long dest_offset_bits, source_offset_bits, source_offset;
+      ULONGEST this_size, this_size_bits;
+      LONGEST dest_offset_bits, source_offset_bits, source_offset;
       const gdb_byte *intermediate_buffer;
 
       /* Compute size, source, and destination offsets for copying, in
@@ -1913,13 +1913,13 @@ static void
 write_pieced_value (struct value *to, struct value *from)
 {
   int i;
-  long offset = 0;
+  LONGEST offset = 0;
   ULONGEST bits_to_skip;
   const gdb_byte *contents;
   struct piece_closure *c
     = (struct piece_closure *) value_computed_closure (to);
   struct frame_info *frame = frame_find_by_id (VALUE_FRAME_ID (to));
-  size_t type_len;
+  ULONGEST type_len;
   size_t buffer_size = 0;
   char *buffer = NULL;
   struct cleanup *cleanup;
@@ -1947,8 +1947,8 @@ write_pieced_value (struct value *to, struct value *from)
   for (i = 0; i < c->n_pieces && offset < type_len; i++)
     {
       struct dwarf_expr_piece *p = &c->pieces[i];
-      size_t this_size_bits, this_size;
-      long dest_offset_bits, source_offset_bits, dest_offset, source_offset;
+      ULONGEST this_size_bits, this_size;
+      LONGEST dest_offset_bits, source_offset_bits, dest_offset, source_offset;
       int need_bitwise;
       const gdb_byte *source_buffer;
 
@@ -2077,8 +2077,8 @@ write_pieced_value (struct value *to, struct value *from)
    implicit pointer.  */
 
 static int
-check_pieced_value_bits (const struct value *value, int bit_offset,
-			 int bit_length,
+check_pieced_value_bits (const struct value *value, LONGEST bit_offset,
+			 LONGEST bit_length,
 			 enum dwarf_value_location check_for)
 {
   struct piece_closure *c
@@ -2094,7 +2094,7 @@ check_pieced_value_bits (const struct value *value, int bit_offset,
   for (i = 0; i < c->n_pieces && bit_length > 0; i++)
     {
       struct dwarf_expr_piece *p = &c->pieces[i];
-      size_t this_size_bits = p->size;
+      ULONGEST this_size_bits = p->size;
 
       if (bit_offset > 0)
 	{
@@ -2132,8 +2132,8 @@ check_pieced_value_bits (const struct value *value, int bit_offset,
 }
 
 static int
-check_pieced_value_validity (const struct value *value, int bit_offset,
-			     int bit_length)
+check_pieced_value_validity (const struct value *value, LONGEST bit_offset,
+			     LONGEST bit_length)
 {
   return check_pieced_value_bits (value, bit_offset, bit_length,
 				  DWARF_VALUE_MEMORY);
@@ -2151,8 +2151,8 @@ check_pieced_value_invalid (const struct value *value)
    a synthetic pointer.  */
 
 static int
-check_pieced_synthetic_pointer (const struct value *value, int bit_offset,
-				int bit_length)
+check_pieced_synthetic_pointer (const struct value *value, LONGEST bit_offset,
+				LONGEST bit_length)
 {
   return check_pieced_value_bits (value, bit_offset, bit_length,
 				  DWARF_VALUE_IMPLICIT_POINTER);
@@ -2177,9 +2177,10 @@ indirect_pieced_value (struct value *value)
   struct type *type;
   struct frame_info *frame;
   struct dwarf2_locexpr_baton baton;
-  int i, bit_offset, bit_length;
+  int i;
+  LONGEST bit_length;
   struct dwarf_expr_piece *piece = NULL;
-  LONGEST byte_offset;
+  LONGEST byte_offset, bit_offset;
 
   type = check_typedef (value_type (value));
   if (TYPE_CODE (type) != TYPE_CODE_PTR)
@@ -2193,7 +2194,7 @@ indirect_pieced_value (struct value *value)
   for (i = 0; i < c->n_pieces && bit_length > 0; i++)
     {
       struct dwarf_expr_piece *p = &c->pieces[i];
-      size_t this_size_bits = p->size;
+      ULONGEST this_size_bits = p->size;
 
       if (bit_offset > 0)
 	{
@@ -2409,7 +2410,7 @@ dwarf2_evaluate_loc_desc_full (struct type *type, struct frame_info *frame,
 	    struct value *value = dwarf_expr_fetch (ctx, 0);
 	    gdb_byte *contents;
 	    const gdb_byte *val_bytes;
-	    size_t n = TYPE_LENGTH (value_type (value));
+	    ULONGEST n = TYPE_LENGTH (value_type (value));
 
 	    if (byte_offset + TYPE_LENGTH (type) > n)
 	      invalid_synthetic_pointer ();

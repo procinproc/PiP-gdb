@@ -54,11 +54,11 @@ static int typecmp (int staticp, int varargs, int nargs,
 		    struct field t1[], struct value *t2[]);
 
 static struct value *search_struct_field (const char *, struct value *, 
-					  int, struct type *, int);
+					  LONGEST, struct type *, int);
 
 static struct value *search_struct_method (const char *, struct value **,
 					   struct value **,
-					   int, int *, struct type *);
+					   LONGEST, int *, struct type *);
 
 static int find_oload_champ_namespace (struct value **, int,
 				       const char *, const char *,
@@ -86,7 +86,7 @@ oload_classification classify_oload_match (struct badness_vector *,
 					   int, int);
 
 static struct value *value_struct_elt_for_reference (struct type *,
-						     int, struct type *,
+						     LONGEST, struct type *,
 						     char *,
 						     struct type *,
 						     int, enum noside);
@@ -103,8 +103,8 @@ static CORE_ADDR allocate_space_in_inferior (int);
 static struct value *cast_into_complex (struct type *, struct value *);
 
 static struct fn_field *find_method_list (struct value **, const char *,
-					  int, struct type *, int *,
-					  struct type **, int *);
+					  LONGEST, struct type *, int *,
+					  struct type **, LONGEST *);
 
 void _initialize_valops (void);
 
@@ -189,7 +189,7 @@ find_function_in_inferior (const char *name, struct objfile **objf_p)
    space.  */
 
 struct value *
-value_allocate_space_in_inferior (int len)
+value_allocate_space_in_inferior (LONGEST len)
 {
   struct objfile *objf;
   struct value *val = find_function_in_inferior ("malloc", &objf);
@@ -262,7 +262,8 @@ value_cast_structs (struct type *type, struct value *v2)
   if (TYPE_NAME (t2) != NULL)
     {
       /* Try downcasting using the run-time type of the value.  */
-      int full, top, using_enc;
+      int full, using_enc;
+      LONGEST top;
       struct type *real_type;
 
       real_type = value_rtti_type (v2, &full, &top, &using_enc);
@@ -401,12 +402,12 @@ value_cast (struct type *type, struct value *arg2)
   if (code1 == TYPE_CODE_ARRAY)
     {
       struct type *element_type = TYPE_TARGET_TYPE (type);
-      unsigned element_length = TYPE_LENGTH (check_typedef (element_type));
+      ULONGEST element_length = TYPE_LENGTH (check_typedef (element_type));
 
       if (element_length > 0 && TYPE_ARRAY_UPPER_BOUND_IS_UNDEFINED (type))
 	{
 	  struct type *range_type = TYPE_INDEX_TYPE (type);
-	  int val_length = TYPE_LENGTH (type2);
+	  LONGEST val_length = TYPE_LENGTH (type2);
 	  LONGEST low_bound, high_bound, new_length;
 
 	  if (get_discrete_bounds (range_type, &low_bound, &high_bound) < 0)
@@ -640,7 +641,7 @@ value_reinterpret_cast (struct type *type, struct value *arg)
 static int
 dynamic_cast_check_1 (struct type *desired_type,
 		      const gdb_byte *valaddr,
-		      int embedded_offset,
+		      LONGEST embedded_offset,
 		      CORE_ADDR address,
 		      struct value *val,
 		      struct type *search_type,
@@ -652,8 +653,8 @@ dynamic_cast_check_1 (struct type *desired_type,
 
   for (i = 0; i < TYPE_N_BASECLASSES (search_type) && result_count < 2; ++i)
     {
-      int offset = baseclass_offset (search_type, i, valaddr, embedded_offset,
-				     address, val);
+      LONGEST offset = baseclass_offset (search_type, i, valaddr,
+					 embedded_offset, address, val);
 
       if (class_types_same_p (desired_type, TYPE_BASECLASS (search_type, i)))
 	{
@@ -687,7 +688,7 @@ dynamic_cast_check_1 (struct type *desired_type,
 static int
 dynamic_cast_check_2 (struct type *desired_type,
 		      const gdb_byte *valaddr,
-		      int embedded_offset,
+		      LONGEST embedded_offset,
 		      CORE_ADDR address,
 		      struct value *val,
 		      struct type *search_type,
@@ -697,7 +698,7 @@ dynamic_cast_check_2 (struct type *desired_type,
 
   for (i = 0; i < TYPE_N_BASECLASSES (search_type) && result_count < 2; ++i)
     {
-      int offset;
+      LONGEST offset;
 
       if (! BASETYPE_VIA_PUBLIC (search_type, i))
 	continue;
@@ -728,7 +729,8 @@ dynamic_cast_check_2 (struct type *desired_type,
 struct value *
 value_dynamic_cast (struct type *type, struct value *arg)
 {
-  int full, top, using_enc;
+  int full, using_enc;
+  LONGEST top;
   struct type *resolved_type = check_typedef (type);
   struct type *arg_type = check_typedef (value_type (arg));
   struct type *class_type, *rtti_type;
@@ -1181,7 +1183,7 @@ value_fetch_lazy (struct value *val)
 }
 
 void
-read_value_memory (struct value *val, int embedded_offset,
+read_value_memory (struct value *val, LONGEST embedded_offset,
 		   int stack, CORE_ADDR memaddr,
 		   gdb_byte *buffer, size_t length)
 {
@@ -1332,7 +1334,7 @@ value_assign (struct value *toval, struct value *fromval)
       {
 	const gdb_byte *dest_buffer;
 	CORE_ADDR changed_addr;
-	int changed_len;
+	LONGEST changed_len;
         gdb_byte buffer[sizeof (LONGEST)];
 
 	if (value_bitsize (toval))
@@ -1411,7 +1413,7 @@ value_assign (struct value *toval, struct value *fromval)
 	    if (value_bitsize (toval))
 	      {
 		struct value *parent = value_parent (toval);
-		int offset = value_offset (parent) + value_offset (toval);
+		LONGEST offset = value_offset (parent) + value_offset (toval);
 		int changed_len;
 		gdb_byte buffer[sizeof (LONGEST)];
 		int optim, unavail;
@@ -1891,7 +1893,7 @@ value_array (int lowbound, int highbound, struct value **elemvec)
 {
   int nelem;
   int idx;
-  unsigned int typelength;
+  ULONGEST typelength;
   struct value *val;
   struct type *arraytype;
 
@@ -2066,7 +2068,7 @@ typecmp (int staticp, int varargs, int nargs,
 
 static void
 update_search_result (struct value **result_ptr, struct value *v,
-		      int *last_boffset, int boffset,
+		      LONGEST *last_boffset, LONGEST boffset,
 		      const char *name, struct type *type)
 {
   if (v != NULL)
@@ -2090,10 +2092,10 @@ update_search_result (struct value **result_ptr, struct value *v,
    lookup is ambiguous.  */
 
 static void
-do_search_struct_field (const char *name, struct value *arg1, int offset,
+do_search_struct_field (const char *name, struct value *arg1, LONGEST offset,
 			struct type *type, int looking_for_baseclass,
 			struct value **result_ptr,
-			int *last_boffset,
+			LONGEST *last_boffset,
 			struct type *outermost_type)
 {
   int i;
@@ -2148,7 +2150,7 @@ do_search_struct_field (const char *name, struct value *arg1, int offset,
 		   <variant field>.  */
 
 		struct value *v = NULL;
-		int new_offset = offset;
+		LONGEST new_offset = offset;
 
 		/* This is pretty gross.  In G++, the offset in an
 		   anonymous union is relative to the beginning of the
@@ -2187,7 +2189,7 @@ do_search_struct_field (const char *name, struct value *arg1, int offset,
 			     && (strcmp_iw (name, 
 					    TYPE_BASECLASS_NAME (type, 
 								 i)) == 0));
-      int boffset = value_embedded_offset (arg1) + offset;
+      LONGEST boffset = value_embedded_offset (arg1) + offset;
 
       if (BASETYPE_VIA_VIRTUAL (type, i))
 	{
@@ -2262,11 +2264,11 @@ do_search_struct_field (const char *name, struct value *arg1, int offset,
    fields, look for a baseclass named NAME.  */
 
 static struct value *
-search_struct_field (const char *name, struct value *arg1, int offset,
+search_struct_field (const char *name, struct value *arg1, LONGEST offset,
 		     struct type *type, int looking_for_baseclass)
 {
   struct value *result = NULL;
-  int boffset = 0;
+  LONGEST boffset = 0;
 
   do_search_struct_field (name, arg1, offset, type, looking_for_baseclass,
 			  &result, &boffset, type);
@@ -2283,7 +2285,7 @@ search_struct_field (const char *name, struct value *arg1, int offset,
 
 static struct value *
 search_struct_method (const char *name, struct value **arg1p,
-		      struct value **args, int offset,
+		      struct value **args, LONGEST offset,
 		      int *static_memfuncp, struct type *type)
 {
   int i;
@@ -2347,8 +2349,8 @@ search_struct_method (const char *name, struct value **arg1p,
 
   for (i = TYPE_N_BASECLASSES (type) - 1; i >= 0; i--)
     {
-      int base_offset;
-      int this_offset;
+      LONGEST base_offset;
+      LONGEST this_offset;
 
       if (BASETYPE_VIA_VIRTUAL (type, i))
 	{
@@ -2530,8 +2532,8 @@ value_struct_elt (struct value **argp, struct value **args,
 
 static struct fn_field *
 find_method_list (struct value **argp, const char *method,
-		  int offset, struct type *type, int *num_fns,
-		  struct type **basetype, int *boffset)
+		  LONGEST offset, struct type *type, int *num_fns,
+		  struct type **basetype, LONGEST *boffset)
 {
   int i;
   struct fn_field *f;
@@ -2564,7 +2566,7 @@ find_method_list (struct value **argp, const char *method,
   /* Not found in object, check in base subobjects.  */
   for (i = TYPE_N_BASECLASSES (type) - 1; i >= 0; i--)
     {
-      int base_offset;
+      LONGEST base_offset;
 
       if (BASETYPE_VIA_VIRTUAL (type, i))
 	{
@@ -2600,7 +2602,7 @@ find_method_list (struct value **argp, const char *method,
 static struct fn_field *
 value_find_oload_method_list (struct value **argp, const char *method,
 			      int offset, int *num_fns, 
-			      struct type **basetype, int *boffset)
+			      struct type **basetype, LONGEST *boffset)
 {
   struct type *t;
 
@@ -2690,7 +2692,7 @@ find_overload_match (struct value **args, int nargs,
   /* Number of overloaded instances being considered.  */
   int num_fns = 0;
   struct type *basetype = NULL;
-  int boffset;
+  LONGEST boffset;
 
   struct cleanup *all_cleanups = make_cleanup (null_cleanup, NULL);
 
@@ -3360,7 +3362,7 @@ compare_parameters (struct type *t1, struct type *t2, int skip_artificial)
    the form "DOMAIN::NAME".  */
 
 static struct value *
-value_struct_elt_for_reference (struct type *domain, int offset,
+value_struct_elt_for_reference (struct type *domain, LONGEST offset,
 				struct type *curtype, char *name,
 				struct type *intype, 
 				int want_address,
@@ -3397,7 +3399,7 @@ value_struct_elt_for_reference (struct type *domain, int offset,
 	  if (want_address)
 	    return value_from_longest
 	      (lookup_memberptr_type (TYPE_FIELD_TYPE (t, i), domain),
-	       offset + (LONGEST) (TYPE_FIELD_BITPOS (t, i) >> 3));
+	       offset + (TYPE_FIELD_BITPOS (t, i) >> 3));
 	  else if (noside == EVAL_AVOID_SIDE_EFFECTS)
 	    return allocate_value (TYPE_FIELD_TYPE (t, i));
 	  else
@@ -3540,7 +3542,7 @@ value_struct_elt_for_reference (struct type *domain, int offset,
   for (i = TYPE_N_BASECLASSES (t) - 1; i >= 0; i--)
     {
       struct value *v;
-      int base_offset;
+      LONGEST base_offset;
 
       if (BASETYPE_VIA_VIRTUAL (t, i))
 	base_offset = 0;
@@ -3630,7 +3632,7 @@ value_maybe_namespace_elt (const struct type *curtype,
 
 struct type *
 value_rtti_indirect_type (struct value *v, int *full, 
-			  int *top, int *using_enc)
+			  LONGEST *top, int *using_enc)
 {
   struct value *target;
   struct type *type, *real_type, *target_type;
@@ -3680,12 +3682,12 @@ value_rtti_indirect_type (struct value *v, int *full,
 struct value *
 value_full_object (struct value *argp, 
 		   struct type *rtype, 
-		   int xfull, int xtop,
+		   int xfull, LONGEST xtop,
 		   int xusing_enc)
 {
   struct type *real_type;
   int full = 0;
-  int top = -1;
+  LONGEST top = -1;
   int using_enc = 0;
   struct value *new_val;
 

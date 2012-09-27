@@ -571,7 +571,7 @@ s390_can_use_hw_breakpoint (int type, int cnt, int othertype)
 }
 
 static int
-s390_region_ok_for_hw_watchpoint (CORE_ADDR addr, int cnt)
+s390_region_ok_for_hw_watchpoint (CORE_ADDR addr, LONGEST cnt)
 {
   return 1;
 }

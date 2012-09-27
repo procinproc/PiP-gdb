@@ -132,7 +132,7 @@ static const struct generic_val_print_decorations c_decorations =
 
 void
 c_val_print (struct type *type, const gdb_byte *valaddr,
-	     int embedded_offset, CORE_ADDR address,
+	     LONGEST embedded_offset, CORE_ADDR address,
 	     struct ui_file *stream, int recurse,
 	     const struct value *original_value,
 	     const struct value_print_options *options)
@@ -143,7 +143,7 @@ c_val_print (struct type *type, const gdb_byte *valaddr,
   unsigned len;
   struct type *elttype, *unresolved_elttype;
   struct type *unresolved_type = type;
-  unsigned eltlen;
+  ULONGEST eltlen;
   CORE_ADDR addr;
 
   CHECK_TYPEDEF (type);
@@ -379,9 +379,9 @@ c_val_print (struct type *type, const gdb_byte *valaddr,
 	  /* Print vtable entry - we only get here if NOT using
 	     -fvtable_thunks.  (Otherwise, look under
 	     TYPE_CODE_PTR.)  */
-	  int offset = (embedded_offset
-			+ TYPE_FIELD_BITPOS (type,
-					     VTBL_FNADDR_OFFSET) / 8);
+	  LONGEST offset = (embedded_offset
+			    + TYPE_FIELD_BITPOS (type,
+						 VTBL_FNADDR_OFFSET) / 8);
 	  struct type *field_type = TYPE_FIELD_TYPE (type,
 						     VTBL_FNADDR_OFFSET);
 	  CORE_ADDR addr
@@ -460,7 +460,8 @@ c_value_print (struct value *val, struct ui_file *stream,
 	       const struct value_print_options *options)
 {
   struct type *type, *real_type, *val_type;
-  int full, top, using_enc;
+  int full, using_enc;
+  LONGEST top;
   struct value_print_options opts = *options;
 
   opts.deref_ref = 1;

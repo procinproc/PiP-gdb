@@ -266,7 +266,7 @@ java_value_print (struct value *val, struct ui_file *stream,
 
 static void
 java_print_value_fields (struct type *type, const gdb_byte *valaddr,
-			 int offset,
+			 LONGEST offset,
 			 CORE_ADDR address, struct ui_file *stream,
 			 int recurse,
 			 const struct value *val,
@@ -465,7 +465,7 @@ java_print_value_fields (struct type *type, const gdb_byte *valaddr,
 
 void
 java_val_print (struct type *type, const gdb_byte *valaddr,
-		int embedded_offset, CORE_ADDR address,
+		LONGEST embedded_offset, CORE_ADDR address,
 		struct ui_file *stream, int recurse,
 		const struct value *val,
 		const struct value_print_options *options)

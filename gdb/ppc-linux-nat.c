@@ -1492,7 +1492,7 @@ ppc_linux_can_use_hw_breakpoint (int type, int cnt, int ot)
 }
 
 static int
-ppc_linux_region_ok_for_hw_watchpoint (CORE_ADDR addr, int len)
+ppc_linux_region_ok_for_hw_watchpoint (CORE_ADDR addr, LONGEST len)
 {
   /* Handle sub-8-byte quantities.  */
   if (len <= 0)

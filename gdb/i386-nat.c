@@ -290,7 +290,7 @@ static int i386_remove_aligned_watchpoint (struct i386_debug_reg_state *state,
    valid value, bombs through internal_error.  */
 static int i386_handle_nonaligned_watchpoint (struct i386_debug_reg_state *state,
 					      i386_wp_op_t what,
-					      CORE_ADDR addr, int len,
+					      CORE_ADDR addr, LONGEST len,
 					      enum target_hw_bp_type type);
 
 /* Implementation.  */
@@ -501,8 +501,8 @@ i386_remove_aligned_watchpoint (struct i386_debug_reg_state *state,
 
 static int
 i386_handle_nonaligned_watchpoint (struct i386_debug_reg_state *state,
-				   i386_wp_op_t what, CORE_ADDR addr, int len,
-				   enum target_hw_bp_type type)
+				   i386_wp_op_t what, CORE_ADDR addr,
+				   LONGEST len, enum target_hw_bp_type type)
 {
   int retval = 0;
   int max_wp_len = TARGET_HAS_DR_LEN_8 ? 8 : 4;
@@ -662,7 +662,7 @@ i386_remove_watchpoint (CORE_ADDR addr, int len, int type,
    address ADDR and whose length is LEN bytes.  */
 
 static int
-i386_region_ok_for_watchpoint (CORE_ADDR addr, int len)
+i386_region_ok_for_watchpoint (CORE_ADDR addr, LONGEST len)
 {
   struct i386_debug_reg_state *state
     = i386_debug_reg_state (ptid_get_pid (inferior_ptid));

@@ -37,7 +37,7 @@
 
 static void
 print_go_string (struct type *type, const gdb_byte *valaddr,
-		 int embedded_offset, CORE_ADDR address,
+		 LONGEST embedded_offset, CORE_ADDR address,
 		 struct ui_file *stream, int recurse,
 		 const struct value *val,
 		 const struct value_print_options *options)
@@ -86,9 +86,9 @@ print_go_string (struct type *type, const gdb_byte *valaddr,
 /* Implements the la_val_print routine for language Go.  */
 
 void
-go_val_print (struct type *type, const gdb_byte *valaddr, int embedded_offset,
-	      CORE_ADDR address, struct ui_file *stream, int recurse,
-	      const struct value *val,
+go_val_print (struct type *type, const gdb_byte *valaddr,
+	      LONGEST embedded_offset, CORE_ADDR address,
+	      struct ui_file *stream, int recurse, const struct value *val,
 	      const struct value_print_options *options)
 {
   CHECK_TYPEDEF (type);

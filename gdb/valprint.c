@@ -299,7 +299,7 @@ scalar_type_p (struct type *type)
 int
 valprint_check_validity (struct ui_file *stream,
 			 struct type *type,
-			 int embedded_offset,
+			 LONGEST embedded_offset,
 			 const struct value *val)
 {
   CHECK_TYPEDEF (type);
@@ -363,7 +363,7 @@ val_print_invalid_address (struct ui_file *stream)
 
 void
 generic_val_print (struct type *type, const gdb_byte *valaddr,
-		   int embedded_offset, CORE_ADDR address,
+		   LONGEST embedded_offset, CORE_ADDR address,
 		   struct ui_file *stream, int recurse,
 		   const struct value *original_value,
 		   const struct value_print_options *options,
@@ -725,7 +725,7 @@ generic_val_print (struct type *type, const gdb_byte *valaddr,
    RECURSE.  */
 
 void
-val_print (struct type *type, const gdb_byte *valaddr, int embedded_offset,
+val_print (struct type *type, const gdb_byte *valaddr, LONGEST embedded_offset,
 	   CORE_ADDR address, struct ui_file *stream, int recurse,
 	   const struct value *val,
 	   const struct value_print_options *options,
@@ -937,7 +937,7 @@ val_print_type_code_flags (struct type *type, const gdb_byte *valaddr,
 
 void
 val_print_scalar_formatted (struct type *type,
-			    const gdb_byte *valaddr, int embedded_offset,
+			    const gdb_byte *valaddr, LONGEST embedded_offset,
 			    const struct value *val,
 			    const struct value_print_options *options,
 			    int size,
@@ -1478,7 +1478,7 @@ print_decimal_chars (struct ui_file *stream, const gdb_byte *valaddr,
 
 void
 print_hex_chars (struct ui_file *stream, const gdb_byte *valaddr,
-		 unsigned len, enum bfd_endian byte_order)
+		 ULONGEST len, enum bfd_endian byte_order)
 {
   const gdb_byte *p;
 
@@ -1595,23 +1595,23 @@ maybe_print_array_index (struct type *index_type, LONGEST index,
 
 void
 val_print_array_elements (struct type *type,
-			  const gdb_byte *valaddr, int embedded_offset,
+			  const gdb_byte *valaddr, LONGEST embedded_offset,
 			  CORE_ADDR address, struct ui_file *stream,
 			  int recurse,
 			  const struct value *val,
 			  const struct value_print_options *options,
-			  unsigned int i)
+			  ULONGEST i)
 {
   unsigned int things_printed = 0;
-  unsigned len;
+  ULONGEST len;
   struct type *saved_type = type;
   struct type *elttype, *index_type;
-  unsigned eltlen;
+  ULONGEST eltlen;
   /* Position of the array element we are examining to see
      whether it is repeated.  */
-  unsigned int rep1;
+  ULONGEST rep1;
   /* Number of repetitions we have detected so far.  */
-  unsigned int reps;
+  ULONGEST reps;
   LONGEST low_bound, high_bound;
   struct cleanup *back_to;
   CORE_ADDR saved_address = address;
@@ -1706,7 +1706,7 @@ val_print_array_elements (struct type *type,
 		     address, stream, recurse + 1, val, options,
 		     current_language);
 	  annotate_elt_rep (reps);
-	  fprintf_filtered (stream, " <repeats %u times>", reps);
+	  fprintf_filtered (stream, " <repeats %s times>", pulongest (reps));
 	  annotate_elt_rep_end ();
 
 	  i = rep1 - 1;
@@ -2357,7 +2357,7 @@ print_converted_chars_to_obstack (struct obstack *obstack,
 
 void
 generic_printstr (struct ui_file *stream, struct type *type, 
-		  const gdb_byte *string, unsigned int length, 
+		  const gdb_byte *string, ULONGEST length,
 		  const char *encoding, int force_ellipses,
 		  int quote_char, int c_style_terminator,
 		  const struct value_print_options *options)

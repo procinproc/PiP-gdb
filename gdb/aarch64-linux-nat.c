@@ -427,14 +427,14 @@ aarch64_notify_debug_reg_change (const struct aarch64_debug_reg_state *state,
 static void
 aarch64_show_debug_reg_state (struct aarch64_debug_reg_state *state,
 			      const char *func, CORE_ADDR addr,
-			      int len, int type)
+			      LONGEST len, int type)
 {
   int i;
 
   fprintf_unfiltered (gdb_stdlog, "%s", func);
   if (addr || len)
-    fprintf_unfiltered (gdb_stdlog, " (addr=0x%08lx, len=%d, type=%s)",
-			(unsigned long) addr, len,
+    fprintf_unfiltered (gdb_stdlog, " (addr=0x%08lx, len=%s, type=%s)",
+			(unsigned long) addr, plongest (len),
 			type == hw_write ? "hw-write-watchpoint"
 			: (type == hw_read ? "hw-read-watchpoint"
 			   : (type == hw_access ? "hw-access-watchpoint"
@@ -866,9 +866,9 @@ aarch64_linux_read_description (struct target_ops *ops)
    gdbserver/linux-aarch64-low.c for more information.  */
 
 static void
-aarch64_align_watchpoint (CORE_ADDR addr, int len, CORE_ADDR *aligned_addr_p,
+aarch64_align_watchpoint (CORE_ADDR addr, LONGEST len, CORE_ADDR *aligned_addr_p,
 			  int *aligned_len_p, CORE_ADDR *next_addr_p,
-			  int *next_len_p)
+			  LONGEST *next_len_p)
 {
   int aligned_len;
   unsigned int offset;
@@ -988,7 +988,7 @@ aarch64_watchpoint_length (unsigned int ctrl)
    breakpoint/watchpoint control register.  */
 
 static unsigned int
-aarch64_point_encode_ctrl_reg (int type, int len)
+aarch64_point_encode_ctrl_reg (int type, LONGEST len)
 {
   unsigned int ctrl, ttype;
 
@@ -1034,7 +1034,7 @@ aarch64_point_encode_ctrl_reg (int type, int len)
    Return 0 for any non-compliant ADDR and/or LEN; return 1 otherwise.  */
 
 static int
-aarch64_point_is_aligned (int is_watchpoint, CORE_ADDR addr, int len)
+aarch64_point_is_aligned (int is_watchpoint, CORE_ADDR addr, LONGEST len)
 {
   unsigned int alignment = is_watchpoint ? AARCH64_HWP_ALIGNMENT
     : AARCH64_HBP_ALIGNMENT;
@@ -1053,7 +1053,7 @@ aarch64_point_is_aligned (int is_watchpoint, CORE_ADDR addr, int len)
 
 static int
 aarch64_dr_state_insert_one_point (struct aarch64_debug_reg_state *state,
-				   int type, CORE_ADDR addr, int len)
+				   int type, CORE_ADDR addr, LONGEST len)
 {
   int i, idx, num_regs, is_watchpoint;
   unsigned int ctrl, *dr_ctrl_p, *dr_ref_count;
@@ -1125,7 +1125,7 @@ aarch64_dr_state_insert_one_point (struct aarch64_debug_reg_state *state,
 
 static int
 aarch64_dr_state_remove_one_point (struct aarch64_debug_reg_state *state,
-				   int type, CORE_ADDR addr, int len)
+				   int type, CORE_ADDR addr, LONGEST len)
 {
   int i, num_regs, is_watchpoint;
   unsigned int ctrl, *dr_ctrl_p, *dr_ref_count;
@@ -1264,7 +1264,7 @@ aarch64_linux_remove_hw_breakpoint (struct gdbarch *gdbarch,
    from that it is an aligned watchpoint to be handled.  */
 
 static int
-aarch64_handle_aligned_watchpoint (int type, CORE_ADDR addr, int len,
+aarch64_handle_aligned_watchpoint (int type, CORE_ADDR addr, LONGEST len,
 				   int is_insert)
 {
   struct aarch64_debug_reg_state *state
@@ -1284,7 +1284,7 @@ aarch64_handle_aligned_watchpoint (int type, CORE_ADDR addr, int len,
    Return 0 if succeed.  */
 
 static int
-aarch64_handle_unaligned_watchpoint (int type, CORE_ADDR addr, int len,
+aarch64_handle_unaligned_watchpoint (int type, CORE_ADDR addr, LONGEST len,
 				     int is_insert)
 {
   struct aarch64_debug_reg_state *state
@@ -1309,8 +1309,8 @@ aarch64_handle_unaligned_watchpoint (int type, CORE_ADDR addr, int len,
 	fprintf_unfiltered (gdb_stdlog,
 "handle_unaligned_watchpoint: is_insert: %d\n"
 "                             aligned_addr: 0x%08lx, aligned_len: %d\n"
-"                                next_addr: 0x%08lx,    next_len: %d\n",
-		 is_insert, aligned_addr, aligned_len, addr, len);
+"                                next_addr: 0x%08lx,    next_len: %s\n",
+		 is_insert, aligned_addr, aligned_len, addr, plongest (len));
 
       if (ret != 0)
 	return ret;
@@ -1322,7 +1322,7 @@ aarch64_handle_unaligned_watchpoint (int type, CORE_ADDR addr, int len,
 /* Implements insertion and removal of a single watchpoint.  */
 
 static int
-aarch64_handle_watchpoint (int type, CORE_ADDR addr, int len, int is_insert)
+aarch64_handle_watchpoint (int type, CORE_ADDR addr, LONGEST len, int is_insert)
 {
   if (aarch64_point_is_aligned (1 /* is_watchpoint */ , addr, len))
     return aarch64_handle_aligned_watchpoint (type, addr, len, is_insert);
@@ -1337,15 +1337,15 @@ aarch64_handle_watchpoint (int type, CORE_ADDR addr, int len, int is_insert)
    of the type TYPE.  Return 0 on success, -1 on failure.  */
 
 static int
-aarch64_linux_insert_watchpoint (CORE_ADDR addr, int len, int type,
+aarch64_linux_insert_watchpoint (CORE_ADDR addr, LONGEST len, int type,
 				 struct expression *cond)
 {
   int ret;
 
   if (debug_hw_points)
     fprintf_unfiltered (gdb_stdlog,
-			"insert_watchpoint on entry (addr=0x%08lx, len=%d)\n",
-			(unsigned long) addr, len);
+			"insert_watchpoint on entry (addr=0x%08lx, len=%s)\n",
+			(unsigned long) addr, plongest (len));
 
   gdb_assert (type != hw_execute);
 
@@ -1369,15 +1369,15 @@ aarch64_linux_insert_watchpoint (CORE_ADDR addr, int len, int type,
    type TYPE.  Return 0 on success, -1 on failure.  */
 
 static int
-aarch64_linux_remove_watchpoint (CORE_ADDR addr, int len, int type,
+aarch64_linux_remove_watchpoint (CORE_ADDR addr, LONGEST len, int type,
 				 struct expression *cond)
 {
   int ret;
 
   if (debug_hw_points)
     fprintf_unfiltered (gdb_stdlog,
-			"remove_watchpoint on entry (addr=0x%08lx, len=%d)\n",
-			(unsigned long) addr, len);
+			"remove_watchpoint on entry (addr=0x%08lx, len=%s)\n",
+			(unsigned long) addr, plongest (len));
 
   gdb_assert (type != hw_execute);
 
@@ -1398,7 +1398,7 @@ aarch64_linux_remove_watchpoint (CORE_ADDR addr, int len, int type,
 /* Implement the "to_region_ok_for_hw_watchpoint" target_ops method.  */
 
 static int
-aarch64_linux_region_ok_for_hw_watchpoint (CORE_ADDR addr, int len)
+aarch64_linux_region_ok_for_hw_watchpoint (CORE_ADDR addr, LONGEST len)
 {
   CORE_ADDR aligned_addr;
 
@@ -1488,7 +1488,7 @@ aarch64_linux_stopped_by_watchpoint (void)
 static int
 aarch64_linux_watchpoint_addr_within_range (struct target_ops *target,
 					    CORE_ADDR addr,
-					    CORE_ADDR start, int length)
+					    CORE_ADDR start, LONGEST length)
 {
   return start <= addr && start + length - 1 >= addr;
 }

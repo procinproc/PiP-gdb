@@ -85,7 +85,7 @@ gnuv2_is_operator_name (const char *name)
    TYPE is the type in which F is located.  */
 static struct value *
 gnuv2_virtual_fn_field (struct value **arg1p, struct fn_field * f, int j,
-			struct type * type, int offset)
+			struct type *type, LONGEST offset)
 {
   struct value *arg1 = *arg1p;
   struct type *type1 = check_typedef (value_type (arg1));
@@ -186,7 +186,8 @@ gnuv2_virtual_fn_field (struct value **arg1p, struct fn_field * f, int j,
 
 
 static struct type *
-gnuv2_value_rtti_type (struct value *v, int *full, int *top, int *using_enc)
+gnuv2_value_rtti_type (struct value *v, int *full, LONGEST *top,
+		       int *using_enc)
 {
   struct type *known_type;
   struct type *rtti_type;
@@ -341,9 +342,9 @@ vb_match (struct type *type, int index, struct type *basetype)
    target).  The result is the offset of the baseclass value relative
    to (the address of)(ARG) + OFFSET.  */
 
-static int
+static LONGEST
 gnuv2_baseclass_offset (struct type *type, int index,
-			const bfd_byte *valaddr, int embedded_offset,
+			const bfd_byte *valaddr, LONGEST embedded_offset,
 			CORE_ADDR address, const struct value *val)
 {
   struct type *basetype = TYPE_BASECLASS (type, index);
@@ -361,8 +362,8 @@ gnuv2_baseclass_offset (struct type *type, int index,
 	  if (vb_match (type, i, basetype))
 	    {
 	      struct type *field_type;
-	      int field_offset;
-	      int field_length;
+	      LONGEST field_offset;
+	      LONGEST field_length;
 	      CORE_ADDR addr;
 
 	      field_type = check_typedef (TYPE_FIELD_TYPE (type, i));
@@ -386,7 +387,7 @@ gnuv2_baseclass_offset (struct type *type, int index,
 	  /* Don't go through baseclass_offset, as that wraps
 	     exceptions, thus, inner exceptions would be wrapped more
 	     than once.  */
-	  int boffset =
+	  LONGEST boffset =
 	    gnuv2_baseclass_offset (type, i, valaddr,
 				    embedded_offset, address, val);
 

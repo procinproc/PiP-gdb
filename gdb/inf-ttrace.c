@@ -364,7 +364,7 @@ inf_ttrace_can_use_hw_breakpoint (int type, int len, int ot)
 }
 
 static int
-inf_ttrace_region_ok_for_hw_watchpoint (CORE_ADDR addr, int len)
+inf_ttrace_region_ok_for_hw_watchpoint (CORE_ADDR addr, LONGEST len)
 {
   return 1;
 }

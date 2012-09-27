@@ -80,11 +80,11 @@ builtin_opencl_type (struct gdbarch *gdbarch)
 
 static struct type *
 lookup_opencl_vector_type (struct gdbarch *gdbarch, enum type_code code,
-			   unsigned int el_length, unsigned int flag_unsigned,
+			   ULONGEST el_length, unsigned int flag_unsigned,
 			   int n)
 {
   int i;
-  unsigned int length;
+  ULONGEST length;
   struct type *type = NULL;
   struct type **types = builtin_opencl_type (gdbarch);
 
@@ -174,9 +174,9 @@ lval_func_read (struct value *v)
   struct lval_closure *c = (struct lval_closure *) value_computed_closure (v);
   struct type *type = check_typedef (value_type (v));
   struct type *eltype = TYPE_TARGET_TYPE (check_typedef (value_type (c->val)));
-  int offset = value_offset (v);
-  int elsize = TYPE_LENGTH (eltype);
-  int n, i, j = 0;
+  LONGEST offset = value_offset (v);
+  LONGEST elsize = TYPE_LENGTH (eltype);
+  LONGEST n, i, j = 0;
   LONGEST lowb = 0;
   LONGEST highb = 0;
 
@@ -203,9 +203,9 @@ lval_func_write (struct value *v, struct value *fromval)
   struct lval_closure *c = (struct lval_closure *) value_computed_closure (v);
   struct type *type = check_typedef (value_type (v));
   struct type *eltype = TYPE_TARGET_TYPE (check_typedef (value_type (c->val)));
-  int offset = value_offset (v);
-  int elsize = TYPE_LENGTH (eltype);
-  int n, i, j = 0;
+  LONGEST offset = value_offset (v);
+  LONGEST elsize = TYPE_LENGTH (eltype);
+  LONGEST n, i, j = 0;
   LONGEST lowb = 0;
   LONGEST highb = 0;
 
@@ -243,17 +243,18 @@ lval_func_write (struct value *v, struct value *fromval)
 /* Return nonzero if all bits in V within OFFSET and LENGTH are valid.  */
 
 static int
-lval_func_check_validity (const struct value *v, int offset, int length)
+lval_func_check_validity (const struct value *v, LONGEST offset,
+			  LONGEST length)
 {
   struct lval_closure *c = (struct lval_closure *) value_computed_closure (v);
+  struct type *t = check_typedef (value_type (c->val));
   /* Size of the target type in bits.  */
-  int elsize =
-      TYPE_LENGTH (TYPE_TARGET_TYPE (check_typedef (value_type (c->val)))) * 8;
-  int startrest = offset % elsize;
-  int start = offset / elsize;
-  int endrest = (offset + length) % elsize;
-  int end = (offset + length) / elsize;
-  int i;
+  LONGEST elsize = TYPE_LENGTH (TYPE_TARGET_TYPE (t)) * 8;
+  LONGEST startrest = offset % elsize;
+  LONGEST start = offset / elsize;
+  LONGEST endrest = (offset + length) % elsize;
+  LONGEST end = (offset + length) / elsize;
+  LONGEST i;
 
   if (endrest)
     end++;
@@ -263,8 +264,8 @@ lval_func_check_validity (const struct value *v, int offset, int length)
 
   for (i = start; i < end; i++)
     {
-      int comp_offset = (i == start) ? startrest : 0;
-      int comp_length = (i == end) ? endrest : elsize;
+      LONGEST comp_offset = (i == start) ? startrest : 0;
+      LONGEST comp_length = (i == end) ? endrest : elsize;
 
       if (!value_bits_valid (c->val, c->indices[i] * elsize + comp_offset,
 			     comp_length))
@@ -281,8 +282,8 @@ lval_func_check_any_valid (const struct value *v)
 {
   struct lval_closure *c = (struct lval_closure *) value_computed_closure (v);
   /* Size of the target type in bits.  */
-  int elsize =
-      TYPE_LENGTH (TYPE_TARGET_TYPE (check_typedef (value_type (c->val)))) * 8;
+  LONGEST elsize =
+	   TYPE_LENGTH (TYPE_TARGET_TYPE (check_typedef (value_type (c->val)))) * 8;
   int i;
 
   for (i = 0; i < c->n; i++)
@@ -297,17 +298,17 @@ lval_func_check_any_valid (const struct value *v)
 
 static int
 lval_func_check_synthetic_pointer (const struct value *v,
-				   int offset, int length)
+				   LONGEST offset, LONGEST length)
 {
   struct lval_closure *c = (struct lval_closure *) value_computed_closure (v);
   /* Size of the target type in bits.  */
-  int elsize =
-      TYPE_LENGTH (TYPE_TARGET_TYPE (check_typedef (value_type (c->val)))) * 8;
-  int startrest = offset % elsize;
-  int start = offset / elsize;
-  int endrest = (offset + length) % elsize;
-  int end = (offset + length) / elsize;
-  int i;
+  LONGEST elsize =
+	   TYPE_LENGTH (TYPE_TARGET_TYPE (check_typedef (value_type (c->val)))) * 8;
+  LONGEST startrest = offset % elsize;
+  LONGEST start = offset / elsize;
+  LONGEST endrest = (offset + length) % elsize;
+  LONGEST end = (offset + length) / elsize;
+  LONGEST i;
 
   if (endrest)
     end++;
@@ -317,8 +318,8 @@ lval_func_check_synthetic_pointer (const struct value *v,
 
   for (i = start; i < end; i++)
     {
-      int comp_offset = (i == start) ? startrest : 0;
-      int comp_length = (i == end) ? endrest : elsize;
+      LONGEST comp_offset = (i == start) ? startrest : 0;
+      LONGEST comp_length = (i == end) ? endrest : elsize;
 
       if (!value_bits_synthetic_pointer (c->val,
 					 c->indices[i] * elsize + comp_offset,

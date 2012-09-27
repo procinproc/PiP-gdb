@@ -37,7 +37,7 @@ void source_python_script (FILE *file, const char *filename);
 void run_python_script (int argc, char **argv);
 
 int apply_val_pretty_printer (struct type *type, const gdb_byte *valaddr,
-			      int embedded_offset, CORE_ADDR address,
+			      LONGEST embedded_offset, CORE_ADDR address,
 			      struct ui_file *stream, int recurse,
 			      const struct value *val,
 			      const struct value_print_options *options,

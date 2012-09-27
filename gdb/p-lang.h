@@ -35,7 +35,7 @@ extern void pascal_print_type (struct type *, const char *, struct ui_file *,
 extern void pascal_print_typedef (struct type *, struct symbol *,
 				  struct ui_file *);
 
-extern void pascal_val_print (struct type *, const gdb_byte *, int,
+extern void pascal_val_print (struct type *, const gdb_byte *, LONGEST,
 			      CORE_ADDR, struct ui_file *, int,
 			      const struct value *,
 			      const struct value_print_options *);
@@ -49,13 +49,13 @@ extern void pascal_type_print_method_args (const char *, const char *,
 /* These are in p-lang.c: */
 
 extern int
-  is_pascal_string_type (struct type *, int *, int *, int *,
+  is_pascal_string_type (struct type *, LONGEST *, LONGEST *, LONGEST *,
 			 struct type **, const char **);
 
 extern void pascal_printchar (int, struct type *, struct ui_file *);
 
 extern void pascal_printstr (struct ui_file *, struct type *, const gdb_byte *,
-			     unsigned int, const char *, int,
+			     ULONGEST, const char *, int,
 			     const struct value_print_options *);
 
 extern struct type **const (pascal_builtin_types[]);
@@ -71,7 +71,7 @@ extern void
 				    const struct type_print_options *);
 
 extern void pascal_object_print_value_fields (struct type *, const gdb_byte *,
-					      int,
+					      LONGEST,
 					      CORE_ADDR, struct ui_file *,
 					      int,
 					      const struct value *,

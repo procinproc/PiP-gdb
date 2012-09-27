@@ -2090,7 +2090,7 @@ allocate_gnat_aux_type (struct type *type)
    least as long as OBJFILE.  */
 
 struct type *
-init_type (enum type_code code, int length, int flags,
+init_type (enum type_code code, LONGEST length, int flags,
 	   const char *name, struct objfile *objfile)
 {
   struct type *type;
@@ -2321,8 +2321,8 @@ is_public_ancestor (struct type *base, struct type *dclass)
 
 static int
 is_unique_ancestor_worker (struct type *base, struct type *dclass,
-			   int *offset,
-			   const gdb_byte *valaddr, int embedded_offset,
+			   LONGEST *offset,
+			   const gdb_byte *valaddr, LONGEST embedded_offset,
 			   CORE_ADDR address, struct value *val)
 {
   int i, count = 0;
@@ -2333,7 +2333,7 @@ is_unique_ancestor_worker (struct type *base, struct type *dclass,
   for (i = 0; i < TYPE_N_BASECLASSES (dclass) && count < 2; ++i)
     {
       struct type *iter;
-      int this_offset;
+      LONGEST this_offset;
 
       iter = check_typedef (TYPE_BASECLASS (dclass, i));
 
@@ -2374,7 +2374,7 @@ is_unique_ancestor_worker (struct type *base, struct type *dclass,
 int
 is_unique_ancestor (struct type *base, struct value *val)
 {
-  int offset = -1;
+  LONGEST offset = -1;
 
   return is_unique_ancestor_worker (base, value_type (val), &offset,
 				    value_contents_for_printing (val),
@@ -3283,7 +3283,7 @@ recursive_dump_type (struct type *type, int spaces)
       break;
     }
   puts_filtered ("\n");
-  printfi_filtered (spaces, "length %d\n", TYPE_LENGTH (type));
+  printfi_filtered (spaces, "length %s\n", pulongest (TYPE_LENGTH (type)));
   if (TYPE_OBJFILE_OWNED (type))
     {
       printfi_filtered (spaces, "objfile ");
@@ -3407,8 +3407,8 @@ recursive_dump_type (struct type *type, int spaces)
 			  idx, plongest (TYPE_FIELD_ENUMVAL (type, idx)));
       else
 	printfi_filtered (spaces + 2,
-			  "[%d] bitpos %d bitsize %d type ",
-			  idx, TYPE_FIELD_BITPOS (type, idx),
+			  "[%d] bitpos %s bitsize %d type ",
+			  idx, plongest (TYPE_FIELD_BITPOS (type, idx)),
 			  TYPE_FIELD_BITSIZE (type, idx));
       gdb_print_host_address (TYPE_FIELD_TYPE (type, idx), gdb_stdout);
       printf_filtered (" name '%s' (",
@@ -3922,7 +3922,7 @@ copy_type (const struct type *type)
 
 struct type *
 arch_type (struct gdbarch *gdbarch,
-	   enum type_code code, int length, char *name)
+	   enum type_code code, LONGEST length, char *name)
 {
   struct type *type;
 

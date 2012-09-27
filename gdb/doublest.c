@@ -791,7 +791,7 @@ floatformat_from_doublest (const struct floatformat *fmt,
    but not passed on by GDB.  This should be fixed.  */
 
 static const struct floatformat *
-floatformat_from_length (struct gdbarch *gdbarch, int len)
+floatformat_from_length (struct gdbarch *gdbarch, LONGEST len)
 {
   const struct floatformat *format;
 
@@ -819,8 +819,8 @@ floatformat_from_length (struct gdbarch *gdbarch, int len)
   else
     format = NULL;
   if (format == NULL)
-    error (_("Unrecognized %d-bit floating-point type."),
-	   len * TARGET_CHAR_BIT);
+    error (_("Unrecognized %s-bit floating-point type."),
+	   plongest (len * TARGET_CHAR_BIT));
   return format;
 }
 

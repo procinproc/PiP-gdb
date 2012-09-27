@@ -437,7 +437,7 @@ java_link_class_type (struct gdbarch *gdbarch,
   for (i = TYPE_N_BASECLASSES (type); i < nfields; i++)
     {
       int accflags;
-      int boffset;
+      LONGEST boffset;
 
       if (fields == NULL)
 	{
@@ -887,7 +887,7 @@ java_printchar (int c, struct type *type, struct ui_file *stream)
 static void
 java_printstr (struct ui_file *stream, struct type *type,
 	       const gdb_byte *string,
-	       unsigned int length, const char *encoding, int force_ellipses,
+	       ULONGEST length, const char *encoding, int force_ellipses,
 	       const struct value_print_options *options)
 {
   const char *type_encoding = java_get_encoding (type);

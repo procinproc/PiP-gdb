@@ -58,7 +58,7 @@ static const struct generic_val_print_decorations p_decorations =
 
 void
 pascal_val_print (struct type *type, const gdb_byte *valaddr,
-		  int embedded_offset, CORE_ADDR address,
+		  LONGEST embedded_offset, CORE_ADDR address,
 		  struct ui_file *stream, int recurse,
 		  const struct value *original_value,
 		  const struct value_print_options *options)
@@ -69,8 +69,8 @@ pascal_val_print (struct type *type, const gdb_byte *valaddr,
   unsigned len;
   LONGEST low_bound, high_bound;
   struct type *elttype;
-  unsigned eltlen;
-  int length_pos, length_size, string_pos;
+  ULONGEST eltlen;
+  LONGEST length_pos, length_size, string_pos;
   struct type *char_type;
   CORE_ADDR addr;
   int want_space = 0;
@@ -493,7 +493,7 @@ static void pascal_object_print_static_field (struct value *,
 					      const struct value_print_options *);
 
 static void pascal_object_print_value (struct type *, const gdb_byte *,
-				       int,
+				       LONGEST,
 				       CORE_ADDR, struct ui_file *, int,
 				       const struct value *,
 				       const struct value_print_options *,
@@ -552,7 +552,7 @@ pascal_object_is_vtbl_member (struct type *type)
 
 void
 pascal_object_print_value_fields (struct type *type, const gdb_byte *valaddr,
-				  int offset,
+				  LONGEST offset,
 				  CORE_ADDR address, struct ui_file *stream,
 				  int recurse,
 				  const struct value *val,
@@ -728,7 +728,7 @@ pascal_object_print_value_fields (struct type *type, const gdb_byte *valaddr,
 
 static void
 pascal_object_print_value (struct type *type, const gdb_byte *valaddr,
-			   int offset,
+			   LONGEST offset,
 			   CORE_ADDR address, struct ui_file *stream,
 			   int recurse,
 			   const struct value *val,
@@ -751,11 +751,11 @@ pascal_object_print_value (struct type *type, const gdb_byte *valaddr,
 
   for (i = 0; i < n_baseclasses; i++)
     {
-      int boffset = 0;
+      LONGEST boffset = 0;
       struct type *baseclass = check_typedef (TYPE_BASECLASS (type, i));
       const char *basename = type_name_no_tag (baseclass);
       const gdb_byte *base_valaddr = NULL;
-      int thisoffset;
+      LONGEST thisoffset;
       volatile struct gdb_exception ex;
       int skip = 0;
 

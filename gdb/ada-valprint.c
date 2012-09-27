@@ -41,16 +41,16 @@ static void print_record (struct type *, const gdb_byte *, int,
 			  const struct value_print_options *);
 
 static int print_field_values (struct type *, const gdb_byte *,
-			       int,
+			       LONGEST,
 			       struct ui_file *, int,
 			       const struct value *,
 			       const struct value_print_options *,
-			       int, struct type *, int);
+			       int, struct type *, LONGEST);
 
 static void adjust_type_signedness (struct type *);
 
-static void ada_val_print_1 (struct type *, const gdb_byte *, int, CORE_ADDR,
-			     struct ui_file *, int,
+static void ada_val_print_1 (struct type *, const gdb_byte *, LONGEST,
+			     CORE_ADDR, struct ui_file *, int,
 			     const struct value *,
 			     const struct value_print_options *);
 
@@ -143,7 +143,7 @@ val_print_packed_array_elements (struct type *type, const gdb_byte *valaddr,
   unsigned int things_printed = 0;
   unsigned len;
   struct type *elttype, *index_type;
-  unsigned eltlen;
+  ULONGEST eltlen;
   unsigned long bitsize = TYPE_FIELD_BITSIZE (type, 0);
   struct value *mark = value_mark ();
   LONGEST low = 0;
@@ -292,7 +292,7 @@ ada_emit_char (int c, struct type *type, struct ui_file *stream,
    of a character.  */
 
 static int
-char_at (const gdb_byte *string, int i, int type_len,
+char_at (const gdb_byte *string, LONGEST i, int type_len,
 	 enum bfd_endian byte_order)
 {
   if (type_len == 1)
@@ -462,11 +462,11 @@ ada_print_scalar (struct type *type, LONGEST val, struct ui_file *stream)
 
 static void
 printstr (struct ui_file *stream, struct type *elttype, const gdb_byte *string,
-	  unsigned int length, int force_ellipses, int type_len,
+	  ULONGEST length, int force_ellipses, int type_len,
 	  const struct value_print_options *options)
 {
   enum bfd_endian byte_order = gdbarch_byte_order (get_type_arch (elttype));
-  unsigned int i;
+  ULONGEST i;
   unsigned int things_printed = 0;
   int in_quotes = 0;
   int need_comma = 0;
@@ -481,9 +481,9 @@ printstr (struct ui_file *stream, struct type *elttype, const gdb_byte *string,
     {
       /* Position of the character we are examining
          to see whether it is repeated.  */
-      unsigned int rep1;
+      ULONGEST rep1;
       /* Number of repetitions we have detected so far.  */
-      unsigned int reps;
+      ULONGEST reps;
 
       QUIT;
 
@@ -514,7 +514,8 @@ printstr (struct ui_file *stream, struct type *elttype, const gdb_byte *string,
 	  ada_emit_char (char_at (string, i, type_len, byte_order),
 			 elttype, stream, '\'', type_len);
 	  fputs_filtered ("'", stream);
-	  fprintf_filtered (stream, _(" <repeats %u times>"), reps);
+	  fprintf_filtered (stream, _(" <repeats %s times>"),
+			    pulongest (reps));
 	  i = rep1 - 1;
 	  things_printed += options->repeat_count_threshold;
 	  need_comma = 1;
@@ -542,7 +543,7 @@ printstr (struct ui_file *stream, struct type *elttype, const gdb_byte *string,
 
 void
 ada_printstr (struct ui_file *stream, struct type *type,
-	      const gdb_byte *string, unsigned int length,
+	      const gdb_byte *string, ULONGEST length,
 	      const char *encoding, int force_ellipses,
 	      const struct value_print_options *options)
 {
@@ -556,7 +557,7 @@ ada_printstr (struct ui_file *stream, struct type *type,
 
 void
 ada_val_print (struct type *type, const gdb_byte *valaddr,
-	       int embedded_offset, CORE_ADDR address,
+	       LONGEST embedded_offset, CORE_ADDR address,
 	       struct ui_file *stream, int recurse,
 	       const struct value *val,
 	       const struct value_print_options *options)
@@ -588,8 +589,8 @@ ada_val_print_array (struct type *type, const gdb_byte *valaddr,
     {
       enum bfd_endian byte_order = gdbarch_byte_order (get_type_arch (type));
       struct type *elttype = TYPE_TARGET_TYPE (type);
-      unsigned int eltlen;
-      unsigned int len;
+      ULONGEST eltlen;
+      ULONGEST len;
 
       /* We know that ELTTYPE cannot possibly be null, because we found
 	 that TYPE is a string-like type.  Similarly, the size of ELTTYPE
@@ -607,7 +608,7 @@ ada_val_print_array (struct type *type, const gdb_byte *valaddr,
          elements up to it.  */
       if (options->stop_print_at_null)
         {
-          int temp_len;
+          LONGEST temp_len;
 
           /* Look for a NULL char.  */
           for (temp_len = 0;
@@ -640,7 +641,7 @@ ada_val_print_array (struct type *type, const gdb_byte *valaddr,
 
 static void
 ada_val_print_1 (struct type *type, const gdb_byte *valaddr,
-		 int offset, CORE_ADDR address,
+		 LONGEST offset, CORE_ADDR address,
 		 struct ui_file *stream, int recurse,
 		 const struct value *original_value,
 		 const struct value_print_options *options)
@@ -915,12 +916,12 @@ ada_val_print_1 (struct type *type, const gdb_byte *valaddr,
 
 static int
 print_variant_part (struct type *type, int field_num,
-		    const gdb_byte *valaddr, int offset,
+		    const gdb_byte *valaddr, LONGEST offset,
 		    struct ui_file *stream, int recurse,
 		    const struct value *val,
 		    const struct value_print_options *options,
 		    int comma_needed,
-		    struct type *outer_type, int outer_offset)
+		    struct type *outer_type, LONGEST outer_offset)
 {
   struct type *var_type = TYPE_FIELD_TYPE (type, field_num);
   int which = ada_which_variant_applies (var_type, outer_type,
@@ -1027,11 +1028,11 @@ print_record (struct type *type, const gdb_byte *valaddr,
 
 static int
 print_field_values (struct type *type, const gdb_byte *valaddr,
-		    int offset, struct ui_file *stream, int recurse,
+		    LONGEST offset, struct ui_file *stream, int recurse,
 		    const struct value *val,
 		    const struct value_print_options *options,
 		    int comma_needed,
-		    struct type *outer_type, int outer_offset)
+		    struct type *outer_type, LONGEST outer_offset)
 {
   int i, len;
 
@@ -1097,7 +1098,7 @@ print_field_values (struct type *type, const gdb_byte *valaddr,
 	    }
 	  else
 	    {
-	      int bit_pos = TYPE_FIELD_BITPOS (type, i);
+	      LONGEST bit_pos = TYPE_FIELD_BITPOS (type, i);
 	      int bit_size = TYPE_FIELD_BITSIZE (type, i);
 	      struct value_print_options opts;
 

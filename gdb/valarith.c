@@ -190,15 +190,15 @@ value_subscript (struct value *array, LONGEST index)
    to doubles, but no longer does.  */
 
 struct value *
-value_subscripted_rvalue (struct value *array, LONGEST index, int lowerbound)
+value_subscripted_rvalue (struct value *array, LONGEST index, LONGEST lowerbound)
 {
   struct type *array_type = check_typedef (value_type (array));
   struct type *elt_type = check_typedef (TYPE_TARGET_TYPE (array_type));
-  unsigned int elt_size = TYPE_LENGTH (elt_type);
-  unsigned int elt_stride
+  ULONGEST elt_size = TYPE_LENGTH (elt_type);
+  ULONGEST elt_stride
     = (TYPE_BYTE_STRIDE (TYPE_INDEX_TYPE (array_type)) == 0
        ? elt_size : TYPE_BYTE_STRIDE (TYPE_INDEX_TYPE (array_type)));
-  unsigned int elt_offs = elt_stride * longest_to_int (index - lowerbound);
+  ULONGEST elt_offs = elt_stride * longest_to_int (index - lowerbound);
   struct value *v;
 
   if (index < lowerbound || (!TYPE_ARRAY_UPPER_BOUND_IS_UNDEFINED (array_type)
@@ -635,7 +635,7 @@ value_concat (struct value *arg1, struct value *arg2)
   struct value *inval1;
   struct value *inval2;
   struct value *outval = NULL;
-  int inval1len, inval2len;
+  ssize_t inval1len, inval2len;
   int count, idx;
   char *ptr;
   char inchar;
@@ -1488,7 +1488,7 @@ value_binop (struct value *arg1, struct value *arg2, enum exp_opcode op)
 int
 value_logical_not (struct value *arg1)
 {
-  int len;
+  LONGEST len;
   const gdb_byte *p;
   struct type *type1;
 
@@ -1519,11 +1519,11 @@ value_logical_not (struct value *arg1)
 static int
 value_strcmp (struct value *arg1, struct value *arg2)
 {
-  int len1 = TYPE_LENGTH (value_type (arg1));
-  int len2 = TYPE_LENGTH (value_type (arg2));
+  LONGEST len1 = TYPE_LENGTH (value_type (arg1));
+  LONGEST len2 = TYPE_LENGTH (value_type (arg2));
   const gdb_byte *s1 = value_contents (arg1);
   const gdb_byte *s2 = value_contents (arg2);
-  int i, len = len1 < len2 ? len1 : len2;
+  LONGEST i, len = len1 < len2 ? len1 : len2;
 
   for (i = 0; i < len; i++)
     {

@@ -689,7 +689,7 @@ print_children (PyObject *printer, const char *hint,
 
 int
 apply_val_pretty_printer (struct type *type, const gdb_byte *valaddr,
-			  int embedded_offset, CORE_ADDR address,
+			  LONGEST embedded_offset, CORE_ADDR address,
 			  struct ui_file *stream, int recurse,
 			  const struct value *val,
 			  const struct value_print_options *options,
@@ -837,7 +837,7 @@ gdbpy_default_visualizer (PyObject *self, PyObject *args)
 
 int
 apply_val_pretty_printer (struct type *type, const gdb_byte *valaddr,
-			  int embedded_offset, CORE_ADDR address,
+			  LONGEST embedded_offset, CORE_ADDR address,
 			  struct ui_file *stream, int recurse,
 			  const struct value *val,
 			  const struct value_print_options *options,

@@ -606,7 +606,7 @@ struct main_type
 	   gdbarch_bits_big_endian=0 targets, it is the bit offset to
 	   the LSB.  */
 
-	int bitpos;
+	LONGEST bitpos;
 
 	/* Enum value.  */
 	LONGEST enumval;
@@ -798,7 +798,7 @@ struct type
      HOST_CHAR_BIT.  However, this would still fail to address
      machines based on a ternary or decimal representation.  */
   
-  unsigned length;
+  ULONGEST length;
 
   /* Core type, shared by a group of qualified types.  */
   struct main_type *main_type;
@@ -1542,11 +1542,12 @@ extern struct type *alloc_type_copy (const struct type *);
 extern struct gdbarch *get_type_arch (const struct type *);
 
 /* Helper function to construct objfile-owned types.  */
-extern struct type *init_type (enum type_code, int, int, const char *,
+extern struct type *init_type (enum type_code, LONGEST, int, const char *,
 			       struct objfile *);
 
 /* Helper functions to construct architecture-owned types.  */
-extern struct type *arch_type (struct gdbarch *, enum type_code, int, char *);
+extern struct type *arch_type (struct gdbarch *, enum type_code, LONGEST,
+			       char *);
 extern struct type *arch_integer_type (struct gdbarch *, int, int, char *);
 extern struct type *arch_character_type (struct gdbarch *, int, int, char *);
 extern struct type *arch_boolean_type (struct gdbarch *, int, int, char *);

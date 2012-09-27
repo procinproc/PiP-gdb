@@ -485,7 +485,7 @@ struct target_ops
 
     /* Documentation of this routine is provided with the corresponding
        target_* macro.  */
-    int (*to_region_ok_for_hw_watchpoint) (CORE_ADDR, int);
+    int (*to_region_ok_for_hw_watchpoint) (CORE_ADDR, LONGEST);
 
     int (*to_can_accel_watchpoint_condition) (CORE_ADDR, int, int,
 					      struct expression *);

@@ -175,7 +175,7 @@ struct language_defn
 			  struct ui_file * stream);
 
     void (*la_printstr) (struct ui_file * stream, struct type *elttype,
-			 const gdb_byte *string, unsigned int length,
+			 const gdb_byte *string, ULONGEST length,
 			 const char *encoding, int force_ellipses,
 			 const struct value_print_options *);
 
@@ -217,7 +217,7 @@ struct language_defn
 
     void (*la_val_print) (struct type *type,
 			  const gdb_byte *contents,
-			  int embedded_offset, CORE_ADDR address,
+			  LONGEST embedded_offset, CORE_ADDR address,
 			  struct ui_file *stream, int recurse,
 			  const struct value *val,
 			  const struct value_print_options *options);

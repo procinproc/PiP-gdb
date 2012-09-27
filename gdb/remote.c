@@ -8272,7 +8272,7 @@ int remote_hw_watchpoint_length_limit = -1;
 int remote_hw_breakpoint_limit = -1;
 
 static int
-remote_region_ok_for_hw_watchpoint (CORE_ADDR addr, int len)
+remote_region_ok_for_hw_watchpoint (CORE_ADDR addr, LONGEST len)
 {
   if (remote_hw_watchpoint_length_limit == 0)
     return 0;

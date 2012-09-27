@@ -959,13 +959,13 @@ add_register (struct collection_list *collection, unsigned int regno)
 static void
 add_memrange (struct collection_list *memranges, 
 	      int type, bfd_signed_vma base,
-	      unsigned long len)
+	      ULONGEST len)
 {
   if (info_verbose)
     {
       printf_filtered ("(%d,", type);
       printf_vma (base);
-      printf_filtered (",%ld)\n", len);
+      printf_filtered (",%s)\n", pulongest (len));
     }
 
   /* type: memrange_absolute == memory, other n == basereg */
@@ -994,7 +994,7 @@ collect_symbol (struct collection_list *collect,
 		long frame_regno, long frame_offset,
 		CORE_ADDR scope)
 {
-  unsigned long len;
+  ULONGEST len;
   unsigned int reg;
   bfd_signed_vma offset;
   int treat_as_expr = 0;
@@ -1018,8 +1018,8 @@ collect_symbol (struct collection_list *collect,
 	  char tmp[40];
 
 	  sprintf_vma (tmp, offset);
-	  printf_filtered ("LOC_STATIC %s: collect %ld bytes at %s.\n",
-			   SYMBOL_PRINT_NAME (sym), len,
+	  printf_filtered ("LOC_STATIC %s: collect %s bytes at %s.\n",
+			   SYMBOL_PRINT_NAME (sym), pulongest (len),
 			   tmp /* address */);
 	}
       /* A struct may be a C++ class with static fields, go to general
@@ -1051,8 +1051,8 @@ collect_symbol (struct collection_list *collect,
       offset = frame_offset + SYMBOL_VALUE (sym);
       if (info_verbose)
 	{
-	  printf_filtered ("LOC_LOCAL %s: Collect %ld bytes at offset ",
-			   SYMBOL_PRINT_NAME (sym), len);
+	  printf_filtered ("LOC_LOCAL %s: Collect %s bytes at offset ",
+			   SYMBOL_PRINT_NAME (sym), pulongest (len));
 	  printf_vma (offset);
 	  printf_filtered (" from frame ptr reg %d\n", reg);
 	}
@@ -1063,8 +1063,8 @@ collect_symbol (struct collection_list *collect,
       offset = 0;
       if (info_verbose)
 	{
-	  printf_filtered ("LOC_REGPARM_ADDR %s: Collect %ld bytes at offset ",
-			   SYMBOL_PRINT_NAME (sym), len);
+	  printf_filtered ("LOC_REGPARM_ADDR %s: Collect %s bytes at offset ",
+			   SYMBOL_PRINT_NAME (sym), pulongest (len));
 	  printf_vma (offset);
 	  printf_filtered (" from reg %d\n", reg);
 	}
@@ -1075,8 +1075,8 @@ collect_symbol (struct collection_list *collect,
       offset = frame_offset + SYMBOL_VALUE (sym);
       if (info_verbose)
 	{
-	  printf_filtered ("LOC_LOCAL %s: Collect %ld bytes at offset ",
-			   SYMBOL_PRINT_NAME (sym), len);
+	  printf_filtered ("LOC_LOCAL %s: Collect %s bytes at offset ",
+			   SYMBOL_PRINT_NAME (sym), pulongest (len));
 	  printf_vma (offset);
 	  printf_filtered (" from frame ptr reg %d\n", reg);
 	}
@@ -2657,7 +2657,8 @@ scope_info (char *args, int from_tty)
   const char *symname;
   char *save_args = args;
   struct block_iterator iter;
-  int j, count = 0;
+  int count = 0;
+  LONGEST j;
   struct gdbarch *gdbarch;
   int regno;
 
@@ -2787,8 +2788,11 @@ scope_info (char *args, int from_tty)
 	      break;
 	    }
 	  if (SYMBOL_TYPE (sym))
-	    printf_filtered (", length %d.\n",
-			     TYPE_LENGTH (check_typedef (SYMBOL_TYPE (sym))));
+	    {
+	      ULONGEST len = TYPE_LENGTH (check_typedef (SYMBOL_TYPE (sym)));
+
+	      printf_filtered (", length %s.\n", pulongest (len));
+	    }
 	}
       if (BLOCK_FUNCTION (block))
 	break;

@@ -938,7 +938,7 @@ try_one_watch (struct pt_watch_regs *regs, CORE_ADDR addr,
    the specified region can be covered by the watch registers.  */
 
 static int
-mips_linux_region_ok_for_hw_watchpoint (CORE_ADDR addr, int len)
+mips_linux_region_ok_for_hw_watchpoint (CORE_ADDR addr, LONGEST len)
 {
   struct pt_watch_regs dummy_regs;
   int i;
