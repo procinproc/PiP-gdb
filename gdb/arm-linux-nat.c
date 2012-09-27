@@ -1105,7 +1105,7 @@ arm_linux_region_ok_for_hw_watchpoint (CORE_ADDR addr, LONGEST len)
 
 /* Insert a Hardware breakpoint.  */
 static int
-arm_linux_insert_watchpoint (CORE_ADDR addr, int len, int rw,
+arm_linux_insert_watchpoint (CORE_ADDR addr, LONGEST len, int rw,
 			     struct expression *cond)
 {
   struct lwp_info *lp;
@@ -1123,7 +1123,7 @@ arm_linux_insert_watchpoint (CORE_ADDR addr, int len, int rw,
 
 /* Remove a hardware breakpoint.  */
 static int
-arm_linux_remove_watchpoint (CORE_ADDR addr, int len, int rw,
+arm_linux_remove_watchpoint (CORE_ADDR addr, LONGEST len, int rw,
 			     struct expression *cond)
 {
   struct lwp_info *lp;
@@ -1180,7 +1180,7 @@ arm_linux_stopped_by_watchpoint (void)
 static int
 arm_linux_watchpoint_addr_within_range (struct target_ops *target,
 					CORE_ADDR addr,
-					CORE_ADDR start, int length)
+					CORE_ADDR start, LONGEST length)
 {
   return start <= addr && start + length - 1 >= addr;
 }

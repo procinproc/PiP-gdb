@@ -469,8 +469,8 @@ struct target_ops
 
     /* Documentation of what the two routines below are expected to do is
        provided with the corresponding target_* macros.  */
-    int (*to_remove_watchpoint) (CORE_ADDR, int, int, struct expression *);
-    int (*to_insert_watchpoint) (CORE_ADDR, int, int, struct expression *);
+    int (*to_remove_watchpoint) (CORE_ADDR, LONGEST, int, struct expression *);
+    int (*to_insert_watchpoint) (CORE_ADDR, LONGEST, int, struct expression *);
 
     int (*to_insert_mask_watchpoint) (struct target_ops *,
 				      CORE_ADDR, CORE_ADDR, int);
@@ -481,13 +481,13 @@ struct target_ops
     int to_have_continuable_watchpoint;
     int (*to_stopped_data_address) (struct target_ops *, CORE_ADDR *);
     int (*to_watchpoint_addr_within_range) (struct target_ops *,
-					    CORE_ADDR, CORE_ADDR, int);
+					    CORE_ADDR, CORE_ADDR, LONGEST);
 
     /* Documentation of this routine is provided with the corresponding
        target_* macro.  */
     int (*to_region_ok_for_hw_watchpoint) (CORE_ADDR, LONGEST);
 
-    int (*to_can_accel_watchpoint_condition) (CORE_ADDR, int, int,
+    int (*to_can_accel_watchpoint_condition) (CORE_ADDR, LONGEST, int,
 					      struct expression *);
     int (*to_masked_watch_num_registers) (struct target_ops *,
 					  CORE_ADDR, CORE_ADDR);

@@ -2433,7 +2433,7 @@ procfs_address_to_host_pointer (CORE_ADDR addr)
 #endif
 
 static int
-proc_set_watchpoint (procinfo *pi, CORE_ADDR addr, int len, int wflags)
+proc_set_watchpoint (procinfo *pi, CORE_ADDR addr, LONGEST len, int wflags)
 {
 #if !defined (PCWATCH) && !defined (PIOCSWATCH)
   /* If neither or these is defined, we can't support watchpoints.
@@ -4777,7 +4777,7 @@ procfs_pid_to_str (struct target_ops *ops, ptid_t ptid)
 /* Insert a watchpoint.  */
 
 static int
-procfs_set_watchpoint (ptid_t ptid, CORE_ADDR addr, int len, int rwflag,
+procfs_set_watchpoint (ptid_t ptid, CORE_ADDR addr, LONGEST len, int rwflag,
 		       int after)
 {
 #ifndef AIX5
@@ -4897,7 +4897,7 @@ procfs_stopped_data_address (struct target_ops *targ, CORE_ADDR *addr)
 }
 
 static int
-procfs_insert_watchpoint (CORE_ADDR addr, int len, int type,
+procfs_insert_watchpoint (CORE_ADDR addr, LONGEST len, int type,
 			  struct expression *cond)
 {
   if (!target_have_steppable_watchpoint
@@ -4919,7 +4919,7 @@ procfs_insert_watchpoint (CORE_ADDR addr, int len, int type,
 }
 
 static int
-procfs_remove_watchpoint (CORE_ADDR addr, int len, int type,
+procfs_remove_watchpoint (CORE_ADDR addr, LONGEST len, int type,
 			  struct expression *cond)
 {
   return procfs_set_watchpoint (inferior_ptid, addr, 0, 0, 0);

@@ -49,7 +49,8 @@ static void target_info (char *, int);
 static void default_terminal_info (char *, int);
 
 static int default_watchpoint_addr_within_range (struct target_ops *,
-						 CORE_ADDR, CORE_ADDR, int);
+						 CORE_ADDR, CORE_ADDR,
+						 LONGEST);
 
 static int default_region_ok_for_hw_watchpoint (CORE_ADDR, LONGEST);
 
@@ -114,10 +115,10 @@ static int debug_to_insert_hw_breakpoint (struct gdbarch *,
 static int debug_to_remove_hw_breakpoint (struct gdbarch *,
 					  struct bp_target_info *);
 
-static int debug_to_insert_watchpoint (CORE_ADDR, int, int,
+static int debug_to_insert_watchpoint (CORE_ADDR, LONGEST, int,
 				       struct expression *);
 
-static int debug_to_remove_watchpoint (CORE_ADDR, int, int,
+static int debug_to_remove_watchpoint (CORE_ADDR, LONGEST, int,
 				       struct expression *);
 
 static int debug_to_stopped_by_watchpoint (void);
@@ -125,11 +126,12 @@ static int debug_to_stopped_by_watchpoint (void);
 static int debug_to_stopped_data_address (struct target_ops *, CORE_ADDR *);
 
 static int debug_to_watchpoint_addr_within_range (struct target_ops *,
-						  CORE_ADDR, CORE_ADDR, int);
+						  CORE_ADDR, CORE_ADDR,
+						  LONGEST);
 
 static int debug_to_region_ok_for_hw_watchpoint (CORE_ADDR, LONGEST);
 
-static int debug_to_can_accel_watchpoint_condition (CORE_ADDR, int, int,
+static int debug_to_can_accel_watchpoint_condition (CORE_ADDR, LONGEST, int,
 						    struct expression *);
 
 static void debug_to_terminal_init (void);
@@ -768,10 +770,10 @@ update_current_target (void)
 	    (int (*) (struct gdbarch *, struct bp_target_info *))
 	    return_minus_one);
   de_fault (to_insert_watchpoint,
-	    (int (*) (CORE_ADDR, int, int, struct expression *))
+	    (int (*) (CORE_ADDR, LONGEST, int, struct expression *))
 	    return_minus_one);
   de_fault (to_remove_watchpoint,
-	    (int (*) (CORE_ADDR, int, int, struct expression *))
+	    (int (*) (CORE_ADDR, LONGEST, int, struct expression *))
 	    return_minus_one);
   de_fault (to_stopped_by_watchpoint,
 	    (int (*) (void))
@@ -784,7 +786,7 @@ update_current_target (void)
   de_fault (to_region_ok_for_hw_watchpoint,
 	    default_region_ok_for_hw_watchpoint);
   de_fault (to_can_accel_watchpoint_condition,
-            (int (*) (CORE_ADDR, int, int, struct expression *))
+            (int (*) (CORE_ADDR, LONGEST, int, struct expression *))
             return_zero);
   de_fault (to_terminal_init,
 	    (void (*) (void))
@@ -3585,7 +3587,7 @@ default_region_ok_for_hw_watchpoint (CORE_ADDR addr, LONGEST len)
 static int
 default_watchpoint_addr_within_range (struct target_ops *target,
 				      CORE_ADDR addr,
-				      CORE_ADDR start, int length)
+				      CORE_ADDR start, LONGEST length)
 {
   return addr >= start && addr < start + length;
 }
@@ -4614,7 +4616,7 @@ debug_to_region_ok_for_hw_watchpoint (CORE_ADDR addr, LONGEST len)
 }
 
 static int
-debug_to_can_accel_watchpoint_condition (CORE_ADDR addr, int len, int rw,
+debug_to_can_accel_watchpoint_condition (CORE_ADDR addr, LONGEST len, int rw,
 					 struct expression *cond)
 {
   int retval;
@@ -4624,8 +4626,8 @@ debug_to_can_accel_watchpoint_condition (CORE_ADDR addr, int len, int rw,
 
   fprintf_unfiltered (gdb_stdlog,
 		      "target_can_accel_watchpoint_condition "
-		      "(%s, %d, %d, %s) = %ld\n",
-		      core_addr_to_string (addr), len, rw,
+		      "(%s, %s, %d, %s) = %ld\n",
+		      core_addr_to_string (addr), plongest (len), rw,
 		      host_address_to_string (cond), (unsigned long) retval);
   return retval;
 }
@@ -4660,7 +4662,7 @@ debug_to_stopped_data_address (struct target_ops *target, CORE_ADDR *addr)
 static int
 debug_to_watchpoint_addr_within_range (struct target_ops *target,
 				       CORE_ADDR addr,
-				       CORE_ADDR start, int length)
+				       CORE_ADDR start, LONGEST length)
 {
   int retval;
 
@@ -4668,9 +4670,9 @@ debug_to_watchpoint_addr_within_range (struct target_ops *target,
 							 start, length);
 
   fprintf_filtered (gdb_stdlog,
-		    "target_watchpoint_addr_within_range (%s, %s, %d) = %d\n",
+		    "target_watchpoint_addr_within_range (%s, %s, %s) = %d\n",
 		    core_addr_to_string (addr), core_addr_to_string (start),
-		    length, retval);
+		    plongest (length), retval);
   return retval;
 }
 
@@ -4705,7 +4707,7 @@ debug_to_remove_hw_breakpoint (struct gdbarch *gdbarch,
 }
 
 static int
-debug_to_insert_watchpoint (CORE_ADDR addr, int len, int type,
+debug_to_insert_watchpoint (CORE_ADDR addr, LONGEST len, int type,
 			    struct expression *cond)
 {
   int retval;
@@ -4713,14 +4715,14 @@ debug_to_insert_watchpoint (CORE_ADDR addr, int len, int type,
   retval = debug_target.to_insert_watchpoint (addr, len, type, cond);
 
   fprintf_unfiltered (gdb_stdlog,
-		      "target_insert_watchpoint (%s, %d, %d, %s) = %ld\n",
-		      core_addr_to_string (addr), len, type,
+		      "target_insert_watchpoint (%s, %s, %d, %s) = %ld\n",
+		      core_addr_to_string (addr), plongest (len), type,
 		      host_address_to_string (cond), (unsigned long) retval);
   return retval;
 }
 
 static int
-debug_to_remove_watchpoint (CORE_ADDR addr, int len, int type,
+debug_to_remove_watchpoint (CORE_ADDR addr, LONGEST len, int type,
 			    struct expression *cond)
 {
   int retval;
@@ -4728,8 +4730,8 @@ debug_to_remove_watchpoint (CORE_ADDR addr, int len, int type,
   retval = debug_target.to_remove_watchpoint (addr, len, type, cond);
 
   fprintf_unfiltered (gdb_stdlog,
-		      "target_remove_watchpoint (%s, %d, %d, %s) = %ld\n",
-		      core_addr_to_string (addr), len, type,
+		      "target_remove_watchpoint (%s, %s, %d, %s) = %ld\n",
+		      core_addr_to_string (addr), plongest (len), type,
 		      host_address_to_string (cond), (unsigned long) retval);
   return retval;
 }

@@ -69,10 +69,10 @@ static ptid_t do_attach (ptid_t ptid);
 
 static int procfs_can_use_hw_breakpoint (int, int, int);
 
-static int procfs_insert_hw_watchpoint (CORE_ADDR addr, int len, int type,
+static int procfs_insert_hw_watchpoint (CORE_ADDR addr, LONGEST len, int type,
 					struct expression *cond);
 
-static int procfs_remove_hw_watchpoint (CORE_ADDR addr, int len, int type,
+static int procfs_remove_hw_watchpoint (CORE_ADDR addr, LONGEST len, int type,
 					struct expression *cond);
 
 static int procfs_stopped_by_watchpoint (void);
@@ -1493,14 +1493,14 @@ procfs_can_use_hw_breakpoint (int type, int cnt, int othertype)
 }
 
 static int
-procfs_remove_hw_watchpoint (CORE_ADDR addr, int len, int type,
+procfs_remove_hw_watchpoint (CORE_ADDR addr, LONGEST len, int type,
 			     struct expression *cond)
 {
   return procfs_hw_watchpoint (addr, -1, type);
 }
 
 static int
-procfs_insert_hw_watchpoint (CORE_ADDR addr, int len, int type,
+procfs_insert_hw_watchpoint (CORE_ADDR addr, LONGEST len, int type,
 			     struct expression *cond)
 {
   return procfs_hw_watchpoint (addr, len, type);

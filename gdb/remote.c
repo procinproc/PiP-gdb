@@ -8191,7 +8191,7 @@ watchpoint_to_Z_packet (int type)
 }
 
 static int
-remote_insert_watchpoint (CORE_ADDR addr, int len, int type,
+remote_insert_watchpoint (CORE_ADDR addr, LONGEST len, int type,
 			  struct expression *cond)
 {
   struct remote_state *rs = get_remote_state ();
@@ -8206,7 +8206,7 @@ remote_insert_watchpoint (CORE_ADDR addr, int len, int type,
   p = strchr (rs->buf, '\0');
   addr = remote_address_masked (addr);
   p += hexnumstr (p, (ULONGEST) addr);
-  xsnprintf (p, endbuf - p, ",%x", len);
+  xsnprintf (p, endbuf - p, ",%s", phex_nz (len, sizeof (len)));
 
   putpkt (rs->buf);
   getpkt (&rs->buf, &rs->buf_size, 0);
@@ -8226,7 +8226,7 @@ remote_insert_watchpoint (CORE_ADDR addr, int len, int type,
 
 static int
 remote_watchpoint_addr_within_range (struct target_ops *target, CORE_ADDR addr,
-				     CORE_ADDR start, int length)
+				     CORE_ADDR start, LONGEST length)
 {
   CORE_ADDR diff = remote_address_masked (addr - start);
 
@@ -8235,7 +8235,7 @@ remote_watchpoint_addr_within_range (struct target_ops *target, CORE_ADDR addr,
 
 
 static int
-remote_remove_watchpoint (CORE_ADDR addr, int len, int type,
+remote_remove_watchpoint (CORE_ADDR addr, LONGEST len, int type,
 			  struct expression *cond)
 {
   struct remote_state *rs = get_remote_state ();
@@ -8250,7 +8250,7 @@ remote_remove_watchpoint (CORE_ADDR addr, int len, int type,
   p = strchr (rs->buf, '\0');
   addr = remote_address_masked (addr);
   p += hexnumstr (p, (ULONGEST) addr);
-  xsnprintf (p, endbuf - p, ",%x", len);
+  xsnprintf (p, endbuf - p, ",%s", phex_nz (len, sizeof (len)));
   putpkt (rs->buf);
   getpkt (&rs->buf, &rs->buf_size, 0);
 

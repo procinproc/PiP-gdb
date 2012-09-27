@@ -542,7 +542,7 @@ is_power_of_2 (int val)
 }
 
 static int
-ia64_linux_insert_watchpoint (CORE_ADDR addr, int len, int rw,
+ia64_linux_insert_watchpoint (CORE_ADDR addr, LONGEST len, int rw,
 			      struct expression *cond)
 {
   struct lwp_info *lp;
@@ -596,7 +596,7 @@ ia64_linux_insert_watchpoint (CORE_ADDR addr, int len, int rw,
 }
 
 static int
-ia64_linux_remove_watchpoint (CORE_ADDR addr, int len, int type,
+ia64_linux_remove_watchpoint (CORE_ADDR addr, LONGEST len, int type,
 			      struct expression *cond)
 {
   int idx;

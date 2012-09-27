@@ -589,7 +589,7 @@ i386_update_inferior_debug_regs (struct i386_debug_reg_state *new_state)
    of the type TYPE.  Return 0 on success, -1 on failure.  */
 
 static int
-i386_insert_watchpoint (CORE_ADDR addr, int len, int type,
+i386_insert_watchpoint (CORE_ADDR addr, LONGEST len, int type,
 			struct expression *cond)
 {
   struct i386_debug_reg_state *state
@@ -627,7 +627,7 @@ i386_insert_watchpoint (CORE_ADDR addr, int len, int type,
    address ADDR, whose length is LEN bytes, and for accesses of the
    type TYPE.  Return 0 on success, -1 on failure.  */
 static int
-i386_remove_watchpoint (CORE_ADDR addr, int len, int type,
+i386_remove_watchpoint (CORE_ADDR addr, LONGEST len, int type,
 			struct expression *cond)
 {
   struct i386_debug_reg_state *state

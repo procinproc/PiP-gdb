@@ -2419,7 +2419,7 @@ calculate_mask (CORE_ADDR addr, int len)
    watchpoint.  */
 
 static int
-mips_insert_watchpoint (CORE_ADDR addr, int len, int type,
+mips_insert_watchpoint (CORE_ADDR addr, LONGEST len, int type,
 			struct expression *cond)
 {
   if (mips_set_breakpoint (addr, len, type))
@@ -2431,7 +2431,7 @@ mips_insert_watchpoint (CORE_ADDR addr, int len, int type,
 /* Remove a watchpoint.  */
 
 static int
-mips_remove_watchpoint (CORE_ADDR addr, int len, int type,
+mips_remove_watchpoint (CORE_ADDR addr, LONGEST len, int type,
 			struct expression *cond)
 {
   if (mips_clear_breakpoint (addr, len, type))
