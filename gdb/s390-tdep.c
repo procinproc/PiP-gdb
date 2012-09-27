@@ -2482,7 +2482,7 @@ is_float_like (struct type *type)
 
 
 static int
-is_power_of_two (unsigned int n)
+is_power_of_two (ULONGEST n)
 {
   return ((n & (n - 1)) == 0);
 }
@@ -2668,7 +2668,7 @@ s390_push_dummy_call (struct gdbarch *gdbarch, struct value *function,
       {
         struct value *arg = args[i];
         struct type *type = check_typedef (value_type (arg));
-        unsigned length = TYPE_LENGTH (type);
+        ULONGEST length = TYPE_LENGTH (type);
 
 	if (s390_function_arg_pass_by_reference (type))
 	  {

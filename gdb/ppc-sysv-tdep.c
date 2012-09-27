@@ -68,7 +68,7 @@ ppc_sysv_abi_push_dummy_call (struct gdbarch *gdbarch, struct value *function,
   enum bfd_endian byte_order = gdbarch_byte_order (gdbarch);
   int opencl_abi = ppc_sysv_use_opencl_abi (value_type (function));
   ULONGEST saved_sp;
-  int argspace = 0;		/* 0 is an initial wrong guess.  */
+  LONGEST argspace = 0;		/* 0 is an initial wrong guess.  */
   int write_pass;
 
   gdb_assert (tdep->wordsize == 4);
@@ -99,9 +99,9 @@ ppc_sysv_abi_push_dummy_call (struct gdbarch *gdbarch, struct value *function,
       /* Next available vector register for vector arguments.  */
       int vreg = 2;
       /* Arguments start above the "LR save word" and "Back chain".  */
-      int argoffset = 2 * tdep->wordsize;
+      LONGEST argoffset = 2 * tdep->wordsize;
       /* Structures start after the arguments.  */
-      int structoffset = argoffset + argspace;
+      LONGEST structoffset = argoffset + argspace;
 
       /* If the function is returning a `struct', then the first word
          (which will be passed in r3) is used for struct return
@@ -120,7 +120,7 @@ ppc_sysv_abi_push_dummy_call (struct gdbarch *gdbarch, struct value *function,
 	{
 	  struct value *arg = args[argno];
 	  struct type *type = check_typedef (value_type (arg));
-	  int len = TYPE_LENGTH (type);
+	  ssize_t len = TYPE_LENGTH (type);
 	  const bfd_byte *val = value_contents (arg);
 
 	  if (TYPE_CODE (type) == TYPE_CODE_FLT && len <= 8
@@ -1556,14 +1556,14 @@ ppc64_sysv_abi_push_dummy_call (struct gdbarch *gdbarch,
 	    }
 	  else
 	    {
-	      int byte;
+	      ssize_t byte;
 	      for (byte = 0; byte < TYPE_LENGTH (type);
 		   byte += tdep->wordsize)
 		{
 		  if (write_pass && greg <= 10)
 		    {
 		      gdb_byte regval[MAX_REGISTER_SIZE];
-		      int len = TYPE_LENGTH (type) - byte;
+		      ssize_t len = TYPE_LENGTH (type) - byte;
 		      if (len > tdep->wordsize)
 			len = tdep->wordsize;
 		      memset (regval, 0, sizeof regval);
@@ -1591,7 +1591,7 @@ ppc64_sysv_abi_push_dummy_call (struct gdbarch *gdbarch,
 		     register.  Work around this by always writing the
 		     value to memory.  Fortunately, doing this
 		     simplifies the code.  */
-		  int len = TYPE_LENGTH (type);
+		  ssize_t len = TYPE_LENGTH (type);
 		  if (len < tdep->wordsize)
 		    write_memory (gparam + tdep->wordsize - len, val, len);
 		  else

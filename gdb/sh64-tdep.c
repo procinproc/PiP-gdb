@@ -1058,7 +1058,7 @@ sh64_push_dummy_call (struct gdbarch *gdbarch,
 		      CORE_ADDR struct_addr)
 {
   enum bfd_endian byte_order = gdbarch_byte_order (gdbarch);
-  int stack_offset, stack_alloc;
+  LONGEST stack_offset, stack_alloc;
   int int_argreg;
   int float_argreg;
   int double_argreg;
@@ -1069,7 +1069,7 @@ sh64_push_dummy_call (struct gdbarch *gdbarch,
   CORE_ADDR regval;
   char *val;
   char valbuf[8];
-  int len;
+  LONGEST len;
   int argreg_size;
   int fp_args[12];
 

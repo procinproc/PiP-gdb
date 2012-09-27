@@ -670,13 +670,13 @@ static CORE_ADDR cris_unwind_sp (struct gdbarch *gdbarch,
 
 struct stack_item
 {
-  int len;
+  ssize_t len;
   struct stack_item *prev;
   void *data;
 };
 
 static struct stack_item *
-push_stack_item (struct stack_item *prev, void *contents, int len)
+push_stack_item (struct stack_item *prev, void *contents, ssize_t len)
 {
   struct stack_item *si;
   si = xmalloc (sizeof (struct stack_item));
@@ -849,13 +849,13 @@ cris_push_dummy_call (struct gdbarch *gdbarch, struct value *function,
 
   for (argnum = 0; argnum < nargs; argnum++)
     {
-      int len;
+      ssize_t len;
       char *val;
-      int reg_demand;
-      int i;
+      ssize_t reg_demand;
+      ssize_t i;
       
-      len = TYPE_LENGTH (value_type (args[argnum]));
       val = (char *) value_contents (args[argnum]);
+      len = TYPE_LENGTH (value_type (args[argnum]));
       
       /* How may registers worth of storage do we need for this argument?  */
       reg_demand = (len / 4) + (len % 4 != 0 ? 1 : 0);

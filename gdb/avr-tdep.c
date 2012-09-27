@@ -1170,13 +1170,14 @@ avr_dummy_id (struct gdbarch *gdbarch, struct frame_info *this_frame)
 
 struct stack_item
 {
-  int len;
+  ssize_t len;
   struct stack_item *prev;
   void *data;
 };
 
 static struct stack_item *
-push_stack_item (struct stack_item *prev, const bfd_byte *contents, int len)
+push_stack_item (struct stack_item *prev, const bfd_byte *contents,
+		 ssize_t len)
 {
   struct stack_item *si;
   si = xmalloc (sizeof (struct stack_item));
@@ -1265,12 +1266,12 @@ avr_push_dummy_call (struct gdbarch *gdbarch, struct value *function,
 
   for (i = 0; i < nargs; i++)
     {
-      int last_regnum;
-      int j;
+      ssize_t last_regnum;
+      ssize_t j;
       struct value *arg = args[i];
       struct type *type = check_typedef (value_type (arg));
       const bfd_byte *contents = value_contents (arg);
-      int len = TYPE_LENGTH (type);
+      ssize_t len = TYPE_LENGTH (type);
 
       /* Calculate the potential last register needed.  */
       last_regnum = regnum - (len + (len & 1));

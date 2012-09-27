@@ -506,7 +506,7 @@ bfin_push_dummy_call (struct gdbarch *gdbarch,
   gdb_byte buf[4];
   int i;
   long reg_r0, reg_r1, reg_r2;
-  int total_len = 0;
+  ssize_t total_len = 0;
   enum bfin_abi abi = bfin_abi (gdbarch);
   CORE_ADDR func_addr = find_function_addr (function, NULL);
 
@@ -530,7 +530,7 @@ bfin_push_dummy_call (struct gdbarch *gdbarch,
     {
       struct type *value_type = value_enclosing_type (args[i]);
       struct type *arg_type = check_typedef (value_type);
-      int container_len = (TYPE_LENGTH (value_type) + 3) & ~3;
+      ssize_t container_len = (TYPE_LENGTH (value_type) + 3) & ~3;
 
       sp -= container_len;
       write_memory (sp, value_contents_writeable (args[i]), container_len);

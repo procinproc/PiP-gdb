@@ -1228,7 +1228,7 @@ mn10300_push_dummy_call (struct gdbarch *gdbarch,
   enum bfd_endian byte_order = gdbarch_byte_order (gdbarch);
   const int push_size = register_size (gdbarch, E_PC_REGNUM);
   int regs_used;
-  int len, arg_len; 
+  LONGEST len, arg_len;
   int stack_offset = 0;
   int argnum;
   char *val, valbuf[MAX_REGISTER_SIZE];

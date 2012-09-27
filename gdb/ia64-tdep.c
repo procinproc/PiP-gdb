@@ -3974,8 +3974,10 @@ ia64_push_dummy_call (struct gdbarch *gdbarch, struct value *function,
   int argno;
   struct value *arg;
   struct type *type;
-  int len, argoffset;
-  int nslots, rseslots, memslots, slotnum, nfuncargs;
+  LONGEST argoffset;
+  LONGEST len;
+  int rseslots, slotnum, nfuncargs;
+  LONGEST nslots, memslots;
   int floatreg;
   ULONGEST bsp;
   CORE_ADDR funcdescaddr, pc, global_pointer;

@@ -616,7 +616,7 @@ amd64_return_value (struct gdbarch *gdbarch, struct value *function,
 {
   struct gdbarch_tdep *tdep = gdbarch_tdep (gdbarch);
   enum amd64_reg_class class[2];
-  int len = TYPE_LENGTH (type);
+  LONGEST len = TYPE_LENGTH (type);
   static int integer_regnum[] = { AMD64_RAX_REGNUM, AMD64_RDX_REGNUM };
   static int sse_regnum[] = { AMD64_XMM0_REGNUM, AMD64_XMM1_REGNUM };
   int integer_reg = 0;
@@ -769,8 +769,8 @@ amd64_push_arguments (struct regcache *regcache, int nargs,
      that register number (or a negative value otherwise).  */
   int *arg_addr_regno = alloca (nargs * sizeof (int));
   int num_stack_args = 0;
-  int num_elements = 0;
-  int element = 0;
+  LONGEST num_elements = 0;
+  LONGEST element = 0;
   int integer_reg = 0;
   int sse_reg = 0;
   int i;
@@ -784,7 +784,7 @@ amd64_push_arguments (struct regcache *regcache, int nargs,
   for (i = 0; i < nargs; i++)
     {
       struct type *type = value_type (args[i]);
-      int len = TYPE_LENGTH (type);
+      LONGEST len = TYPE_LENGTH (type);
       enum amd64_reg_class class[2];
       int needed_integer_regs = 0;
       int needed_sse_regs = 0;

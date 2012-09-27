@@ -639,7 +639,8 @@ sparc64_16_byte_align_p (struct type *type)
 
 static void
 sparc64_store_floating_fields (struct regcache *regcache, struct type *type,
-			       const gdb_byte *valbuf, int element, int bitpos)
+			       const gdb_byte *valbuf, int element,
+			       LONGEST bitpos)
 {
   int len = TYPE_LENGTH (type);
 
@@ -681,7 +682,7 @@ sparc64_store_floating_fields (struct regcache *regcache, struct type *type,
       for (i = 0; i < TYPE_NFIELDS (type); i++)
 	{
 	  struct type *subtype = check_typedef (TYPE_FIELD_TYPE (type, i));
-	  int subpos = bitpos + TYPE_FIELD_BITPOS (type, i);
+	  LONGEST subpos = bitpos + TYPE_FIELD_BITPOS (type, i);
 
 	  sparc64_store_floating_fields (regcache, subtype, valbuf,
 					 element, subpos);
@@ -713,7 +714,7 @@ sparc64_store_floating_fields (struct regcache *regcache, struct type *type,
 
 static void
 sparc64_extract_floating_fields (struct regcache *regcache, struct type *type,
-				 gdb_byte *valbuf, int bitpos)
+				 gdb_byte *valbuf, LONGEST bitpos)
 {
   if (sparc64_floating_p (type))
     {
@@ -750,7 +751,7 @@ sparc64_extract_floating_fields (struct regcache *regcache, struct type *type,
       for (i = 0; i < TYPE_NFIELDS (type); i++)
 	{
 	  struct type *subtype = check_typedef (TYPE_FIELD_TYPE (type, i));
-	  int subpos = bitpos + TYPE_FIELD_BITPOS (type, i);
+	  LONGEST subpos = bitpos + TYPE_FIELD_BITPOS (type, i);
 
 	  sparc64_extract_floating_fields (regcache, subtype, valbuf, subpos);
 	}
@@ -783,7 +784,7 @@ sparc64_store_arguments (struct regcache *regcache, int nargs,
   for (i = 0; i < nargs; i++)
     {
       struct type *type = value_type (args[i]);
-      int len = TYPE_LENGTH (type);
+      LONGEST len = TYPE_LENGTH (type);
 
       if (sparc64_structure_or_union_p (type)
 	  || (sparc64_complex_floating_p (type) && len == 32))
@@ -883,7 +884,7 @@ sparc64_store_arguments (struct regcache *regcache, int nargs,
     {
       const gdb_byte *valbuf = value_contents (args[i]);
       struct type *type = value_type (args[i]);
-      int len = TYPE_LENGTH (type);
+      LONGEST len = TYPE_LENGTH (type);
       int regnum = -1;
       gdb_byte buf[16];
 
