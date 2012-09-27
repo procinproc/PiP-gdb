@@ -185,6 +185,7 @@ parse_find_args (char *args, ULONGEST *max_countp,
 	  size_t current_offset = pattern_buf_end - pattern_buf;
 
 	  pattern_buf_size = pattern_buf_size_need * 2;
+	  ulongest_fits_host_or_error (pattern_buf_size);
 	  pattern_buf = xrealloc (pattern_buf, pattern_buf_size);
 	  pattern_buf_end = pattern_buf + current_offset;
 	}

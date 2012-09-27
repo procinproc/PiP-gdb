@@ -3219,6 +3219,18 @@ host_address_to_string (const void *addr)
   return str;
 }
 
+/* Ensure that the input NUM is not larger than the maximum capacity of the
+   host system.  We choose SIZE_MAX / 8 as a conservative estimate of the size
+   of a resource that a system may allocate.  */
+void
+ulongest_fits_host_or_error (ULONGEST num)
+{
+  if (num > SIZE_MAX / 8)
+    error (_("Insufficient memory in host GDB for object of size %s bytes, "
+	     "maximum allowed %s bytes."), pulongest (num),
+	   pulongest (SIZE_MAX / 8));
+}
+
 char *
 gdb_realpath (const char *filename)
 {

@@ -1792,6 +1792,8 @@ read_pieced_value (struct value *v)
 
       this_size = (this_size_bits + source_offset_bits % 8 + 7) / 8;
       source_offset = source_offset_bits / 8;
+      ulongest_fits_host_or_error (this_size);
+
       if (buffer_size < this_size)
 	{
 	  buffer_size = this_size;
@@ -1983,6 +1985,7 @@ write_pieced_value (struct value *to, struct value *from)
 	}
       else
 	{
+	  ulongest_fits_host_or_error (this_size);
 	  if (buffer_size < this_size)
 	    {
 	      buffer_size = this_size;

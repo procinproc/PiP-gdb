@@ -540,6 +540,8 @@ cp_print_value (struct type *type, struct type *real_type,
 		  gdb_byte *buf;
 		  struct cleanup *back_to;
 
+		  ulongest_fits_host_or_error (TYPE_LENGTH (baseclass));
+
 		  buf = xmalloc (TYPE_LENGTH (baseclass));
 		  back_to = make_cleanup (xfree, buf);
 

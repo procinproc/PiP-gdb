@@ -804,4 +804,6 @@ enum block_enum
 
 #include "utils.h"
 
+extern void ulongest_fits_host_or_error (ULONGEST num);
+
 #endif /* #ifndef DEFS_H */
