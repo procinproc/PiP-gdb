@@ -661,7 +661,6 @@ allocate_value_lazy (struct type *type)
      description correctly.  */
   check_typedef (type);
 
-  ulongest_fits_host_or_error (TYPE_LENGTH (type));
   val = (struct value *) xzalloc (sizeof (struct value));
   val->contents = NULL;
   val->next = all_values;
