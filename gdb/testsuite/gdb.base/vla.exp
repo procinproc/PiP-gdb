@@ -16,25 +16,7 @@
 set testfile vla
 set srcfile ${testfile}.c
 set binfile ${objdir}/${subdir}/${testfile}
-# Temporarily provide compiler=gcc44 saving the original value around.
-
-set board [target_info name]
-if [board_info $board exists compiler] {
-    set old_compiler [board_info $board compiler]
-    unset_board_info compiler
-} elseif [info exists old_compiler] {
-    unset old_compiler
-}
-set_board_info compiler gcc44
-
-set err [gdb_compile "${srcdir}/${subdir}/${srcfile}" "${binfile}" executable {debug quiet}]
-
-unset_board_info compiler
-if [info exists old_compiler] {
-    set_board_info compiler $old_compiler
-}
-
-if  { $err != "" } {
+if  { [gdb_compile "${srcdir}/${subdir}/${srcfile}" "${binfile}" executable {debug}] != "" } {
     untested "Couldn't compile test program"
     return -1
 }

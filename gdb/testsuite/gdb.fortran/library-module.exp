@@ -23,34 +23,16 @@ if [get_compiler_info] {
    return -1
 }
 
-# Temporarily provide f90compiler=gfortran44 saving the original value around.
-
-set board [target_info name]
-if [board_info $board exists f90compiler] {
-    set old_f90compiler [board_info $board f90compiler]
-    unset_board_info f90compiler
-} elseif [info exists old_f90compiler] {
-    unset old_f90compiler
+if  { [gdb_compile_shlib "${srcdir}/${subdir}/${srclibfile}" $libfile {debug f90}] != "" } {
+    untested "Couldn't compile ${srclibfile}"
+    return -1
 }
-set_board_info f90compiler gfortran44
 
 # prepare_for_testing cannot be used as linking with $libfile cannot be passed
 # just for the linking phase (and not the source compilation phase).  And any
 # warnings on ignored $libfile abort the process.
 
-set err1 [gdb_compile_shlib "${srcdir}/${subdir}/${srclibfile}" $libfile {debug f90}]
-set err2 [gdb_compile $srcdir/$subdir/$srcfile $binfile executable [list debug f90 shlib=$libfile]]
-
-unset_board_info f90compiler
-if [info exists old_f90compiler] {
-    set_board_info f90compiler $old_f90compiler
-}
-
-if  { $err1 != "" } {
-    untested "Couldn't compile ${srclibfile}"
-    return -1
-}
-if  { $err2 != "" } {
+if  { [gdb_compile $srcdir/$subdir/$srcfile $binfile executable [list debug f90 shlib=$libfile]] != "" } {
     untested "Couldn't compile ${srcfile}"
     return -1
 }
