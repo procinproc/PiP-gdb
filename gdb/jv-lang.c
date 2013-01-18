@@ -428,7 +428,8 @@ java_link_class_type (struct gdbarch *gdbarch,
 
   fields = NULL;
   nfields--;			/* First set up dummy "class" field.  */
-  SET_FIELD_PHYSADDR (TYPE_FIELD (type, nfields), value_address (clas));
+  SET_FIELD_PHYSADDR (TYPE_FIELD (type, nfields), value_address (clas)
+    - (TYPE_OBJFILE (type) == NULL ? 0 : ANOFFSET (TYPE_OBJFILE (type)->section_offsets, SECT_OFF_TEXT (TYPE_OBJFILE (type)))));
   TYPE_FIELD_NAME (type, nfields) = "class";
   TYPE_FIELD_TYPE (type, nfields) = value_type (clas);
   SET_TYPE_FIELD_PRIVATE (type, nfields);
@@ -476,7 +477,8 @@ java_link_class_type (struct gdbarch *gdbarch,
 	  SET_TYPE_FIELD_PROTECTED (type, i);
 	}
       if (accflags & 0x0008)	/* ACC_STATIC */
-	SET_FIELD_PHYSADDR (TYPE_FIELD (type, i), boffset);
+	SET_FIELD_PHYSADDR (TYPE_FIELD (type, i), boffset
+	  - (TYPE_OBJFILE (type) == NULL ? 0 : ANOFFSET (TYPE_OBJFILE (type)->section_offsets, SECT_OFF_TEXT (TYPE_OBJFILE (type)))));
       else
 	SET_FIELD_BITPOS (TYPE_FIELD (type, i), 8 * boffset);
       if (accflags & 0x8000)	/* FIELD_UNRESOLVED_FLAG */
