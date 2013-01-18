@@ -32,7 +32,25 @@ set binshareddebugfile ${objdir}/${subdir}/${binsharedbase}.debug
 
 # FIXME: gcc dependency (-Wl,-soname).
 
-if  { [gdb_compile_shlib "${srcdir}/${subdir}/${srcsharedfile}" "${binsharedfile}" [list debug additional_flags=-Wl,-soname=${binsharedbase}]] != "" } {
+# Temporarily provide compiler=gcc44 saving the original value around.
+
+set board [target_info name]
+if [board_info $board exists compiler] {
+    set old_compiler [board_info $board compiler]
+    unset_board_info compiler
+} elseif [info exists old_compiler] {
+    unset old_compiler
+}
+set_board_info compiler gcc44
+
+set err [gdb_compile_shlib "${srcdir}/${subdir}/${srcsharedfile}" "${binsharedfile}" [list debug additional_flags=-Wl,-soname=${binsharedbase}]]
+
+unset_board_info compiler
+if [info exists old_compiler] {
+    set_board_info compiler $old_compiler
+}
+
+if { $err != "" } {
     untested "Couldn't compile test library"
     return -1
 }

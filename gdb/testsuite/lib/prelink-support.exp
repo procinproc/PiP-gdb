@@ -119,9 +119,31 @@ proc file_copy {src dest} {
 proc build_executable_own_libs {testname executable sources options {interp ""} {dir ""}} {
     global objdir subdir
 
-    if {[build_executable $testname $executable $sources $options] == -1} {
-	return ""
+    # Temporarily provide compiler=gcc44 saving the original value around.
+    # RHEL-5 workaround of its:
+    #   gcc: -rpath: linker input file unused because linking not done
+    #   gcc: --dynamic-linker: linker input file unused because linking not done
+
+    set board [target_info name]
+    if [board_info $board exists compiler] {
+	set old_compiler [board_info $board compiler]
+	unset_board_info compiler
+    } elseif [info exists old_compiler] {
+	unset old_compiler
     }
+    set_board_info compiler gcc44
+
+    set err [build_executable $testname $executable $sources $options]
+
+    unset_board_info compiler
+    if [info exists old_compiler] {
+	set_board_info compiler $old_compiler
+    }
+
+    if { $err == -1 } {
+	return ""   
+    }
+
     set binfile ${objdir}/${subdir}/${executable}
 
     set command "ldd $binfile"

@@ -34,9 +34,29 @@ if [get_compiler_info] {
     return -1
 }
 
+# Temporarily provide compiler=gcc44 saving the original value around.
+# RHEL-5 workaround of its:
+#   gcc: -soname: linker input file unused because linking not done
+
+set board [target_info name]
+if [board_info $board exists compiler] {
+    set old_compiler [board_info $board compiler]
+    unset_board_info compiler
+} elseif [info exists old_compiler] {
+    unset old_compiler
+}
+set_board_info compiler gcc44
+
 # Use -soname so that the new library gets copied by build_executable_own_libs.
 
-if {[gdb_compile_shlib ${srcdir}/${subdir}/${srcfile_lib} ${binfile_lib} [list debug ldflags=-Wl,-soname,${test}.so]] != ""} {
+set err [gdb_compile_shlib ${srcdir}/${subdir}/${srcfile_lib} ${binfile_lib} [list debug ldflags=-Wl,-soname,${test}.so]]
+
+unset_board_info compiler
+if [info exists old_compiler] {
+    set_board_info compiler $old_compiler
+}
+
+if { $err != "" } {
     return -1
 }
 

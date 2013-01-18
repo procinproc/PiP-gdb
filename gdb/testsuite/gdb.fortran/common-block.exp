@@ -22,8 +22,25 @@ if {[skip_fortran_tests]} {
 
 standard_testfile .f90
 
-if {[prepare_for_testing ${testfile}.exp ${testfile} \
-	 $srcfile {debug f90 quiet}]} {
+# Temporarily provide f90compiler=gfortran44 saving the original value around.
+
+set board [target_info name]
+if [board_info $board exists f90compiler] {
+    set old_f90compiler [board_info $board f90compiler]
+    unset_board_info f90compiler
+} elseif [info exists old_f90compiler] {
+    unset old_f90compiler
+}
+set_board_info f90compiler gfortran44
+
+set err [prepare_for_testing ${testfile}.exp ${testfile} $srcfile {debug f90 quiet}]
+
+unset_board_info f90compiler
+if [info exists old_f90compiler] {
+    set_board_info f90compiler $old_f90compiler
+}
+
+if {$err} {
     return -1
 }
 

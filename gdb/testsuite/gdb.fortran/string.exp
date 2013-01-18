@@ -23,7 +23,25 @@ set testfile "string"
 set srcfile ${testfile}.f90
 set binfile ${objdir}/${subdir}/${testfile}
 
-if  { [gdb_compile "${srcdir}/${subdir}/${srcfile}" "${binfile}" executable {debug f90 quiet}] != "" } {
+# Temporarily provide f90compiler=gfortran44 saving the original value around.
+
+set board [target_info name]
+if [board_info $board exists f90compiler] {
+    set old_f90compiler [board_info $board f90compiler]
+    unset_board_info f90compiler
+} elseif [info exists old_f90compiler] {
+    unset old_f90compiler
+}
+set_board_info f90compiler gfortran44
+
+set err [gdb_compile "${srcdir}/${subdir}/${srcfile}" "${binfile}" executable {debug f90 quiet}]
+
+unset_board_info f90compiler
+if [info exists old_f90compiler] {
+    set_board_info f90compiler $old_f90compiler
+}
+
+if { $err != "" } {
     untested "Couldn't compile ${srcfile}"
     return -1
 }
