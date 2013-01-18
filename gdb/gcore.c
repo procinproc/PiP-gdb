@@ -549,8 +549,14 @@ gcore_copy_callback (bfd *obfd, asection *osec, void *ignored)
       if (size > total_size)
 	size = total_size;
 
+      /* Warn if read error occurs except if we were trying to read the
+	 first page for ia64.  The first page is marked readable, but it cannot
+	 be read.  */
       if (target_read_memory (bfd_section_vma (obfd, osec) + offset,
-			      memhunk, size) != 0)
+			      memhunk, size) != 0
+	  && (strcmp (gdbarch_bfd_arch_info (target_gdbarch ())->arch_name,
+		      "ia64")
+	      || bfd_section_vma (obfd, osec) != 0))
 	{
 	  warning (_("Memory read failed for corefile "
 		     "section, %s bytes at %s."),
