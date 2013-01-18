@@ -44,7 +44,9 @@
 #if !defined (_LIBC) && defined (__GNU_LIBRARY__) && __GNU_LIBRARY__ > 1
 #include <gnu-versions.h>
 #if _GNU_OBSTACK_INTERFACE_VERSION == OBSTACK_INTERFACE_VERSION
+#if 0 /* 64-bit obstack is not compatible with any glibc implementation.  */
 #define ELIDE_CODE
+#endif
 #endif
 #endif
 
@@ -139,7 +141,7 @@ struct obstack *_obstack;
    free up some memory, then call this again.  */
 
 int
-_obstack_begin (struct obstack *h, int size, int alignment,
+_obstack_begin (struct obstack *h, PTR_INT_TYPE size, int alignment,
                 POINTER (*chunkfun) (long), void (*freefun) (void *))
 {
   register struct _obstack_chunk *chunk; /* points to new chunk */
@@ -183,7 +185,7 @@ _obstack_begin (struct obstack *h, int size, int alignment,
 }
 
 int
-_obstack_begin_1 (struct obstack *h, int size, int alignment,
+_obstack_begin_1 (struct obstack *h, PTR_INT_TYPE size, int alignment,
                   POINTER (*chunkfun) (POINTER, long),
                   void (*freefun) (POINTER, POINTER), POINTER arg)
 {
@@ -235,7 +237,7 @@ _obstack_begin_1 (struct obstack *h, int size, int alignment,
    to the beginning of the new one.  */
 
 void
-_obstack_newchunk (struct obstack *h, int length)
+_obstack_newchunk (struct obstack *h, PTR_INT_TYPE length)
 {
   register struct _obstack_chunk *old_chunk = h->chunk;
   register struct _obstack_chunk *new_chunk;
@@ -388,11 +390,11 @@ obstack_free (struct obstack *h, POINTER obj)
     abort ();
 }
 
-int
+PTR_INT_TYPE
 _obstack_memory_used (struct obstack *h)
 {
   register struct _obstack_chunk* lp;
-  register int nbytes = 0;
+  register PTR_INT_TYPE nbytes = 0;
 
   for (lp = h->chunk; lp != 0; lp = lp->prev)
     {
@@ -421,6 +423,7 @@ print_and_abort (void)
 }
 
 #if 0
+/* These functions are now broken for 64-bit obstack!  */
 /* These are now turned off because the applications do not use it
    and it uses bcopy via obstack_grow, which causes trouble on sysV.  */
 
