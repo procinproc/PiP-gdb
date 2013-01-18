@@ -27,10 +27,12 @@
 #ifdef HAVE_ZLIB_H
 #include <zlib.h>
 #endif
+#ifndef __sparc__
 #ifdef HAVE_MMAP
 #include <sys/mman.h>
 #ifndef MAP_FAILED
 #define MAP_FAILED ((void *) -1)
+#endif
 #endif
 #endif
 
@@ -205,6 +207,7 @@ free_one_bfd_section (bfd *abfd, asection *sectp, void *ignore)
 
   if (sect != NULL && sect->data != NULL)
     {
+#ifndef __sparc__
 #ifdef HAVE_MMAP
       if (sect->map_addr != NULL)
 	{
@@ -214,6 +217,7 @@ free_one_bfd_section (bfd *abfd, asection *sectp, void *ignore)
 	  gdb_assert (res == 0);
 	}
       else
+#endif
 #endif
 	xfree (sect->data);
     }
@@ -359,6 +363,7 @@ gdb_bfd_map_section (asection *sectp, bfd_size_type *size)
   if (descriptor->data != NULL)
     goto done;
 
+#ifndef __sparc__
 #ifdef HAVE_MMAP
   if (!bfd_is_section_compressed (abfd, sectp))
     {
@@ -393,6 +398,7 @@ gdb_bfd_map_section (asection *sectp, bfd_size_type *size)
 	}
     }
 #endif /* HAVE_MMAP */
+#endif
 
   /* Handle compressed sections, or ordinary uncompressed sections in
      the no-mmap case.  */
