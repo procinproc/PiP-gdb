@@ -1629,7 +1629,7 @@ static const char *const scheduler_enums[] = {
   schedlock_step,
   NULL
 };
-static const char *scheduler_mode = schedlock_off;
+static const char *scheduler_mode = schedlock_step;
 static void
 show_scheduler_mode (struct ui_file *file, int from_tty,
 		     struct cmd_list_element *c, const char *value)

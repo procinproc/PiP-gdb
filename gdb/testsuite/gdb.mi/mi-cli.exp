@@ -163,7 +163,7 @@ mi_execute_to "exec-continue" "breakpoint-hit" "main" "" ".*basics.c" \
 # Test that the token is output even for CLI commands
 # Also test that *stopped includes frame information.
 mi_gdb_test "34 next" \
-    ".*34\\\^running.*\\*running,thread-id=\"all\"" \
+    ".*34\\\^running.*\\*running,thread-id=\"1\"" \
     "34 next: run"
 
 if {!$async} {

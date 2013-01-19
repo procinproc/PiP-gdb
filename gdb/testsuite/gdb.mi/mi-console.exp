@@ -36,6 +36,9 @@ if  { [gdb_compile "${srcdir}/${subdir}/${srcfile}" "${binfile}" executable {deb
 
 mi_run_to_main
 
+# thread-id=\"all\" vs. thread-id=\"1\" below:
+mi_gdb_test "210-gdb-set scheduler-locking off" "210\\^done" "set scheduler-locking off"
+
 # Next over the hello() call which will produce lots of output
 mi_gdb_test "220-exec-next" \
 	    "220\\^running(\r\n\\*running,thread-id=\"all\")?" \
