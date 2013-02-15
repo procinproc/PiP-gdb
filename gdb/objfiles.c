@@ -833,6 +833,11 @@ objfile_relocate1 (struct objfile *objfile,
     objfile->sf->sym_probe_fns->sym_relocate_probe (objfile,
 						    new_offsets, delta);
 
+  /* Final call of breakpoint_re_set can keep breakpoint locations disabled if
+     their addresses match.  */
+  if (objfile->separate_debug_objfile_backlink == NULL)
+    breakpoints_relocate (objfile, delta);
+
   /* Data changed.  */
   return 1;
 }
