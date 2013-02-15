@@ -160,7 +160,15 @@ extern void reopen_exec_file (void);
 /* The `resume' routine should only be called in special circumstances.
    Normally, use `proceed', which handles a lot of bookkeeping.  */
 
-extern void resume (int, enum gdb_signal);
+enum resume_step
+  {
+    /* currently_stepping () should return non-zero for non-continue.  */
+    RESUME_STEP_CONTINUE = 0,
+    RESUME_STEP_USER,		/* Stepping is intentional by the user.  */
+    RESUME_STEP_NEEDED		/* Stepping only for software watchpoints.  */
+  };
+
+extern void resume (enum resume_step, enum gdb_signal);
 
 extern ptid_t user_visible_resume_ptid (int step);
 

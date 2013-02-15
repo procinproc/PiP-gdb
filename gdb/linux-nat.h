@@ -73,8 +73,8 @@ struct lwp_info
   /* If non-zero, a pending wait status.  */
   int status;
 
-  /* Non-zero if we were stepping this LWP.  */
-  int step;
+  /* The kind of stepping of this LWP.  */
+  enum resume_step step;
 
   /* STOPPED_BY_WATCHPOINT is non-zero if this LWP stopped with a data
      watchpoint trap.  */

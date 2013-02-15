@@ -2971,7 +2971,11 @@ static int
 select_singlestep_lwp_callback (struct lwp_info *lp, void *data)
 {
   if (lp->last_resume_kind == resume_step
-      && lp->status != 0)
+      && lp->status != 0
+      /* We do not focus on software watchpoints as we would not catch
+	 STEPPING_PAST_SINGLESTEP_BREAKPOINT breakpoints in some other thread
+	 as they would remain pending due to `Push back breakpoint for %s'.  */
+      && lp->step == RESUME_STEP_USER)
     return 1;
   else
     return 0;

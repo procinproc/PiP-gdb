@@ -82,7 +82,7 @@ static int follow_fork (void);
 static void set_schedlock_func (char *args, int from_tty,
 				struct cmd_list_element *c);
 
-static int currently_stepping (struct thread_info *tp);
+static enum resume_step currently_stepping (struct thread_info *tp);
 
 static int currently_stepping_or_nexting_callback (struct thread_info *tp,
 						   void *data);
@@ -1710,7 +1710,8 @@ user_visible_resume_ptid (int step)
     }
   else if ((scheduler_mode == schedlock_on)
 	   || (scheduler_mode == schedlock_step
-	       && (step || singlestep_breakpoints_inserted_p)))
+	       && (step == RESUME_STEP_USER
+		   || singlestep_breakpoints_inserted_p)))
     {
       /* User-settable 'scheduler' mode requires solo thread resume.  */
       resume_ptid = inferior_ptid;
@@ -1728,7 +1729,7 @@ user_visible_resume_ptid (int step)
    STEP nonzero if we should step (zero to continue instead).
    SIG is the signal to give the inferior (zero for none).  */
 void
-resume (int step, enum gdb_signal sig)
+resume (enum resume_step step, enum gdb_signal sig)
 {
   int should_resume = 1;
   struct cleanup *old_cleanups = make_cleanup (resume_cleanups, 0);
@@ -1761,9 +1762,13 @@ resume (int step, enum gdb_signal sig)
 
   if (debug_infrun)
     fprintf_unfiltered (gdb_stdlog,
-                        "infrun: resume (step=%d, signal=%d), "
+                        "infrun: resume (step=%s, signal=%d), "
 			"trap_expected=%d, current thread [%s] at %s\n",
- 			step, sig, tp->control.trap_expected,
+			(step == RESUME_STEP_CONTINUE
+			 ? "RESUME_STEP_CONTINUE"
+			 : (step == RESUME_STEP_USER ? "RESUME_STEP_USER"
+						     : "RESUME_STEP_NEEDED")),
+ 			sig, tp->control.trap_expected,
 			target_pid_to_str (inferior_ptid),
 			paddress (gdbarch, pc));
 
@@ -2141,7 +2146,7 @@ proceed (CORE_ADDR addr, enum gdb_signal siggnal, int step)
   CORE_ADDR pc;
   struct address_space *aspace;
   /* GDB may force the inferior to step due to various reasons.  */
-  int force_step = 0;
+  enum resume_step resume_step = RESUME_STEP_CONTINUE;
 
   /* If we're stopped at a fork/vfork, follow the branch set by the
      "set follow-fork-mode" command; otherwise, we'll just proceed
@@ -2181,13 +2186,13 @@ proceed (CORE_ADDR addr, enum gdb_signal siggnal, int step)
 	   actually be executing the breakpoint insn anyway.
 	   We'll be (un-)executing the previous instruction.  */
 
-	force_step = 1;
+	resume_step = RESUME_STEP_USER;
       else if (gdbarch_single_step_through_delay_p (gdbarch)
 	       && gdbarch_single_step_through_delay (gdbarch,
 						     get_current_frame ()))
 	/* We stepped onto an instruction that needs to be stepped
 	   again before re-inserting the breakpoint, do so.  */
-	force_step = 1;
+	resume_step = RESUME_STEP_USER;
     }
   else
     {
@@ -2218,13 +2223,13 @@ proceed (CORE_ADDR addr, enum gdb_signal siggnal, int step)
 	 is required it returns TRUE and sets the current thread to
 	 the old thread.  */
       if (prepare_to_proceed (step))
-	force_step = 1;
+	resume_step = RESUME_STEP_USER;
     }
 
   /* prepare_to_proceed may change the current thread.  */
   tp = inferior_thread ();
 
-  if (force_step)
+  if (resume_step == RESUME_STEP_USER)
     {
       tp->control.trap_expected = 1;
       /* If displaced stepping is enabled, we can step over the
@@ -2311,9 +2316,13 @@ proceed (CORE_ADDR addr, enum gdb_signal siggnal, int step)
   /* Reset to normal state.  */
   init_infwait_state ();
 
+  if (step)
+    resume_step = RESUME_STEP_USER;
+  if (resume_step == RESUME_STEP_CONTINUE && bpstat_should_step ())
+    resume_step = RESUME_STEP_NEEDED;
+
   /* Resume inferior.  */
-  resume (force_step || step || bpstat_should_step (),
-	  tp->suspend.stop_signal);
+  resume (resume_step, tp->suspend.stop_signal);
 
   /* Wait for it to stop (if not standalone)
      and in any case decode why it stopped, and act accordingly.  */
@@ -5254,13 +5263,18 @@ process_event_stop_test:
 
 /* Is thread TP in the middle of single-stepping?  */
 
-static int
+static enum resume_step
 currently_stepping (struct thread_info *tp)
 {
-  return ((tp->control.step_range_end
-	   && tp->control.step_resume_breakpoint == NULL)
-	  || tp->control.trap_expected
-	  || bpstat_should_step ());
+  if ((tp->control.step_range_end
+       && tp->control.step_resume_breakpoint == NULL)
+      || tp->control.trap_expected)
+    return RESUME_STEP_USER;
+
+  if (bpstat_should_step ())
+    return RESUME_STEP_NEEDED;
+
+  return RESUME_STEP_CONTINUE;
 }
 
 /* Returns true if any thread *but* the one passed in "data" is in the
