@@ -68,6 +68,7 @@
 #include "gdb_bfd.h"
 #include "f-lang.h"
 #include "source.h"
+#include "top.h"
 
 #include <fcntl.h>
 #include "gdb_string.h"
@@ -1793,8 +1794,9 @@ dwarf2_has_info (struct objfile *objfile,
                              (void *) names);
       dwarf2_per_objfile->objfile = objfile;
     }
-  return (dwarf2_per_objfile->info.asection != NULL
-	  && dwarf2_per_objfile->abbrev.asection != NULL);
+  return (! readnever_symbol_files
+	  && (dwarf2_per_objfile->info.asection != NULL
+	      && dwarf2_per_objfile->abbrev.asection != NULL));
 }
 
 /* When loading sections, we look either for uncompressed section or for

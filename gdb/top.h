@@ -58,6 +58,7 @@ extern void set_prompt (const char *s);
 
 /* From random places.  */
 extern int readnow_symbol_files;
+extern int readnever_symbol_files;
 
 /* Perform _initialize initialization.  */
 extern void gdb_init (char *);

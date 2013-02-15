@@ -455,6 +455,7 @@ captured_main (void *data)
       {"xdb", no_argument, &xdb_commands, 1},
       {"dbx", no_argument, &dbx_commands, 1},
       {"readnow", no_argument, &readnow_symbol_files, 1},
+      {"readnever", no_argument, &readnever_symbol_files, 1},
       {"r", no_argument, &readnow_symbol_files, 1},
       {"quiet", no_argument, &quiet, 1},
       {"q", no_argument, &quiet, 1},
@@ -1173,6 +1174,7 @@ Options:\n\n\
   fputs_unfiltered (_("\
   --quiet            Do not print version number on startup.\n\
   --readnow          Fully read symbol files on first access.\n\
+  --readnever        Do not read symbol files.\n\
 "), stream);
   fputs_unfiltered (_("\
   --se=FILE          Use FILE as symbol file and executable file.\n\
