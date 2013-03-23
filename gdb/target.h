@@ -1563,8 +1563,10 @@ extern char *target_thread_name (struct thread_info *);
    bp_hardware_breakpoint.  CNT is the number of such watchpoints used so far
    (including this one?).  OTHERTYPE is who knows what...  */
 
+#ifndef target_can_use_hardware_watchpoint
 #define target_can_use_hardware_watchpoint(TYPE,CNT,OTHERTYPE) \
  (*current_target.to_can_use_hw_breakpoint) (TYPE, CNT, OTHERTYPE);
+#endif
 
 /* Returns the number of debug registers needed to watch the given
    memory region, or zero if not supported.  */
