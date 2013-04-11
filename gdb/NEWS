@@ -1,6 +1,9 @@
 		What has changed in GDB?
 	     (Organized release by release)
 
+* Newly installed $prefix/bin/gcore acts as a shell interface for the
+  GDB command gcore.
+
 *** Changes in GDB 7.6
 
 * Target record has been renamed to record-full.
