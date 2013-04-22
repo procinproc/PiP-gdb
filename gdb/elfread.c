@@ -1727,7 +1727,7 @@ static int missing_rpm_list_entries;
 /* Returns the count of newly added rpms.  */
 
 static int
-missing_rpm_enlist_1 (const char *filename, int verify_vendor)
+missing_rpm_enlist (const char *filename)
 {
   static int rpm_init_done = 0;
   rpmts ts;
@@ -1831,7 +1831,7 @@ missing_rpm_enlist_1 (const char *filename, int verify_vendor)
   mi = rpmtsInitIterator_p (ts, RPMTAG_BASENAMES, filename, 0);
   if (mi != NULL)
     {
-      if (!verify_vendor) for (;;)
+      for (;;)
 	{
 	  Header h;
 	  char *debuginfo, **slot, *s, *s2;
@@ -1949,35 +1949,6 @@ missing_rpm_enlist_1 (const char *filename, int verify_vendor)
 	    xfree (debuginfo);
 	  count++;
 	}
-      else /* verify_vendor */
-	{
-	  int vendor_pass = 0, vendor_fail = 0;
-
-	  for (;;)
-	    {
-	      Header h;
-	      errmsg_t err;
-	      char *vendor;
-
-	      h = rpmdbNextIterator_p (mi);
-	      if (h == NULL)
-		break;
-
-	      vendor = headerFormat_p (h, "%{vendor}", &err);
-	      if (!vendor)
-		{
-		  warning (_("Error querying the rpm file `%s': %s"), filename,
-			   err);
-		  continue;
-		}
-	      if (strcmp (vendor, "Red Hat, Inc.") == 0)
-		vendor_pass = 1;
-	      else
-		vendor_fail = 1;
-	      xfree (vendor);
-	    }
-	  count = vendor_pass != 0 && vendor_fail == 0;
-	}
 
       rpmdbFreeIterator_p (mi);
     }
@@ -1985,19 +1956,6 @@ missing_rpm_enlist_1 (const char *filename, int verify_vendor)
   rpmtsFree_p (ts);
 
   return count;
-}
-
-static int
-missing_rpm_enlist (const char *filename)
-{
-  return missing_rpm_enlist_1 (filename, 0);
-}
-
-extern int rpm_verify_vendor (const char *filename);
-int
-rpm_verify_vendor (const char *filename)
-{
-  return missing_rpm_enlist_1 (filename, 1);
 }
 
 static int
