@@ -10,6 +10,10 @@ add-auto-load-scripts-directory directory
 * Newly installed $prefix/bin/gcore acts as a shell interface for the
   GDB command gcore.
 
+* Python scripting
+
+  ** Frame filters and frame decorators have been added.
+
 * New remote packets
 
 qXfer:libraries-svr4:read's annex
