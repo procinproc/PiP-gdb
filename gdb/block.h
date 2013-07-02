@@ -279,4 +279,6 @@ extern struct symbol *block_iter_match_next (const char *name,
        (sym);						\
        (sym) = block_iterator_next (&(iter)))
 
+extern struct objfile *block_objfile (const struct block *block);
+
 #endif /* BLOCK_H */

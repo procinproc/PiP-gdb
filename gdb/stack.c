@@ -530,6 +530,10 @@ print_frame_args (struct symbol *func, struct frame_info *frame,
   stb = mem_fileopen ();
   old_chain = make_cleanup_ui_file_delete (stb);
 
+  /* Frame may be needed for check_typedef of TYPE_DYNAMIC.  */
+  make_cleanup_restore_selected_frame ();
+  select_frame (frame);
+
   if (func)
     {
       struct block *b = SYMBOL_BLOCK_VALUE (func);

@@ -41,6 +41,7 @@
 #include "gdb_obstack.h"
 #include "objfiles.h"
 #include "python/python.h"
+#include "dwarf2loc.h"
 
 #include "gdb_assert.h"
 
@@ -393,27 +394,217 @@ init_array_element (struct value *array, struct value *element,
 }
 
 static struct value *
-value_f90_subarray (struct value *array,
-		    struct expression *exp, int *pos, enum noside noside)
+value_f90_subarray (struct value *array, struct expression *exp, int *pos,
+		    int nargs, enum noside noside)
 {
-  int pc = (*pos) + 1;
-  LONGEST low_bound, high_bound;
-  struct type *range = check_typedef (TYPE_INDEX_TYPE (value_type (array)));
-  enum f90_range_type range_type = longest_to_int (exp->elts[pc].longconst);
- 
-  *pos += 3;
+  /* Type to use for the newly allocated value ARRAY.  */
+  struct type *new_array_type;
 
-  if (range_type == LOW_BOUND_DEFAULT || range_type == BOTH_BOUND_DEFAULT)
-    low_bound = TYPE_LOW_BOUND (range);
+  /* Type being iterated for each dimension.  */
+  struct type *type, *type_last_target;
+
+  /* Pointer in the last holder to the type of current dimension.  */
+  struct type **typep = &new_array_type;
+
+  struct subscript_index
+    {
+      enum { SUBSCRIPT_RANGE, SUBSCRIPT_NUMBER } kind;
+      union
+	{
+	  struct subscript_range
+	    {
+	      enum f90_range_type f90_range_type;
+	      LONGEST low_bound, high_bound;
+	    }
+	  range;
+	  LONGEST number;
+	};
+    }
+  *subscript_array;
+  struct type **type_array;
+  int i;
+  struct cleanup *old_chain;
+  CORE_ADDR value_byte_address, value_byte_offset = 0;
+  htab_t copied_types;
+  struct value *saved_array;
+
+  old_chain = make_cleanup (null_cleanup, 0);
+  object_address_set (value_raw_address (array));
+
+  if (value_optimized_out (array)
+      || (VALUE_LVAL (array) != not_lval
+          && VALUE_LVAL (array) != lval_memory
+	  && VALUE_LVAL (array) != lval_internalvar_component
+	  && VALUE_LVAL (array) != lval_internalvar))
+    error (_("value being subranged must be in memory"));
+  type = check_typedef (value_type (array));
+  f_object_address_data_valid_or_error (type);
+
+  copied_types = create_copied_types_hash (NULL);
+  type = copy_type_recursive (type, copied_types);
+  htab_delete (copied_types);
+
+  if (nargs != calc_f77_array_dims (type))
+    error (_("Wrong number of subscripts"));
+
+  if (TYPE_DATA_LOCATION_IS_ADDR (type))
+    {
+      value_byte_address = (TYPE_DATA_LOCATION_ADDR (type)
+			    + value_offset (array));
+      TYPE_DATA_LOCATION_IS_ADDR (type) = 0;
+      TYPE_DATA_LOCATION_DWARF_BLOCK (type) = NULL;
+    }
   else
-    low_bound = value_as_long (evaluate_subexp (NULL_TYPE, exp, pos, noside));
+    {
+      gdb_assert (TYPE_DATA_LOCATION_DWARF_BLOCK (type) == NULL);
+      value_byte_address = value_address (array);
+    }
 
-  if (range_type == HIGH_BOUND_DEFAULT || range_type == BOTH_BOUND_DEFAULT)
-    high_bound = TYPE_HIGH_BOUND (range);
+  new_array_type = type;
+
+  subscript_array = alloca (sizeof (*subscript_array) * nargs);
+
+  gdb_assert (nargs > 0);
+
+  /* Now that we know we have a legal array subscript expression 
+     let us actually find out where this element exists in the array.  */
+
+  /* Take array indices left to right.  */
+  for (i = 0; i < nargs; i++)
+    {
+      struct subscript_index *index = &subscript_array[i];
+
+      if (exp->elts[*pos].opcode == OP_F90_RANGE)
+	{
+	  int pc = (*pos) + 1;
+	  struct subscript_range *range;
+
+	  index->kind = SUBSCRIPT_RANGE;
+	  range = &index->range;
+
+	  *pos += 3;
+	  range->f90_range_type = longest_to_int (exp->elts[pc].longconst);
+
+	  if (range->f90_range_type == HIGH_BOUND_DEFAULT
+	      || range->f90_range_type == NONE_BOUND_DEFAULT)
+	    range->low_bound = value_as_long (evaluate_subexp (NULL_TYPE, exp,
+							       pos, noside));
+
+	  if (range->f90_range_type == LOW_BOUND_DEFAULT
+	      || range->f90_range_type == NONE_BOUND_DEFAULT)
+	    range->high_bound = value_as_long (evaluate_subexp (NULL_TYPE, exp,
+								pos, noside));
+	}
+      else
+	{
+	  struct value *val;
+
+	  index->kind = SUBSCRIPT_NUMBER;
+
+	  /* Evaluate each subscript; it must be a legal integer in F77.  */
+	  val = evaluate_subexp_with_coercion (exp, pos, noside);
+	  index->number = value_as_long (val);
+	}
+    }
+
+  /* Internal type of array is arranged right to left.  */
+  for (i = nargs - 1; i >= 0; i--)
+    {
+      struct subscript_index *index = &subscript_array[i];
+      struct type *range_type = TYPE_INDEX_TYPE (type);
+
+      switch (index->kind)
+	{
+	case SUBSCRIPT_RANGE:
+	  {
+	    struct subscript_range *range = &index->range;
+	    CORE_ADDR byte_offset;
+
+	    if (range->f90_range_type == LOW_BOUND_DEFAULT
+		|| range->f90_range_type == BOTH_BOUND_DEFAULT)
+	      range->low_bound = TYPE_LOW_BOUND (range_type);
+
+	    if (range->f90_range_type == HIGH_BOUND_DEFAULT
+		|| range->f90_range_type == BOTH_BOUND_DEFAULT)
+	      range->high_bound = TYPE_HIGH_BOUND (range_type);
+
+	    if (range->low_bound < TYPE_LOW_BOUND (range_type)
+		|| (!TYPE_HIGH_BOUND_UNDEFINED (range_type)
+		    && range->high_bound > TYPE_HIGH_BOUND (range_type)))
+	      error (_("slice out of range"));
+
+	    byte_offset = ((range->low_bound - TYPE_LOW_BOUND (range_type))
+			   * TYPE_ARRAY_BYTE_STRIDE_VALUE (type));
+	    TYPE_LOW_BOUND (range_type) = range->low_bound;
+	    TYPE_HIGH_BOUND (range_type) = range->high_bound;
+	    if (range->f90_range_type == LOW_BOUND_DEFAULT
+		|| range->f90_range_type == NONE_BOUND_DEFAULT)
+	      TYPE_HIGH_BOUND_UNDEFINED (range_type) = 0;
+
+	    typep = &TYPE_TARGET_TYPE (type);
+	    value_byte_offset += byte_offset;
+	    type = TYPE_TARGET_TYPE (type);
+	  }
+	  break;
+
+	case SUBSCRIPT_NUMBER:
+	  {
+	    CORE_ADDR byte_offset;
+
+	    if (index->number < TYPE_LOW_BOUND (range_type)
+		|| (!TYPE_HIGH_BOUND_UNDEFINED (range_type)
+		    && index->number > TYPE_HIGH_BOUND (range_type)))
+	      error (_("no such vector element"));
+
+	    byte_offset = ((index->number - TYPE_LOW_BOUND (range_type))
+			   * TYPE_ARRAY_BYTE_STRIDE_VALUE (type));
+
+	    type = TYPE_TARGET_TYPE (type);
+	    *typep = type;
+	    value_byte_offset += byte_offset;
+	  }
+	  break;
+	}
+    }
+
+  type_last_target = type;
+  type_array = alloca (sizeof (*type_array) * nargs);
+  i = 0;
+  for (type = new_array_type; type != type_last_target;
+       type = TYPE_TARGET_TYPE (type))
+    type_array[i++] = type;
+  while (i > 0)
+    {
+      struct type *type = type_array[--i];
+
+      /* Force TYPE_LENGTH (type) recalculation.  */
+      TYPE_TARGET_STUB (type) = 1;
+      check_typedef (type);
+    }
+
+  saved_array = array;
+  array = allocate_value_lazy (new_array_type);
+  VALUE_LVAL (array) = VALUE_LVAL (saved_array);
+  if (VALUE_LVAL (saved_array) == lval_internalvar_component)
+    VALUE_LVAL (array) = lval_internalvar;
   else
-    high_bound = value_as_long (evaluate_subexp (NULL_TYPE, exp, pos, noside));
+    VALUE_LVAL (array) = VALUE_LVAL (saved_array);
+  VALUE_FRAME_ID (array) = VALUE_FRAME_ID (saved_array);
+  if (VALUE_LVAL (array) != lval_internalvar)
+    set_value_address (array, value_byte_address + value_byte_offset);
 
-  return value_slice (array, low_bound, high_bound - low_bound + 1);
+  if (!value_lazy (saved_array))
+    {
+      allocate_value_contents (array);
+      set_value_lazy (array, 0);
+
+      memcpy (value_contents_writeable (array),
+	      value_contents (saved_array) + value_byte_offset,
+	      TYPE_LENGTH (new_array_type));
+    }
+
+  do_cleanups (old_chain);
+  return array;
 }
 
 
@@ -710,6 +901,7 @@ evaluate_subexp_standard (struct type *expect_type,
   int save_pos1;
   struct symbol *function = NULL;
   char *function_name = NULL;
+  struct cleanup *old_chain;
 
   pc = (*pos)++;
   op = exp->elts[pc].opcode;
@@ -1776,6 +1968,8 @@ evaluate_subexp_standard (struct type *expect_type,
 
       /* First determine the type code we are dealing with.  */
       arg1 = evaluate_subexp (NULL_TYPE, exp, pos, noside);
+      old_chain = make_cleanup (null_cleanup, 0);
+      object_address_set (value_raw_address (arg1));
       type = check_typedef (value_type (arg1));
       code = TYPE_CODE (type);
 
@@ -1796,23 +1990,13 @@ evaluate_subexp_standard (struct type *expect_type,
 	      code = TYPE_CODE (type);
 	    }
 	} 
+      do_cleanups (old_chain);
 
       switch (code)
 	{
 	case TYPE_CODE_ARRAY:
-	  if (exp->elts[*pos].opcode == OP_F90_RANGE)
-	    return value_f90_subarray (arg1, exp, pos, noside);
-	  else
-	    goto multi_f77_subscript;
-
 	case TYPE_CODE_STRING:
-	  if (exp->elts[*pos].opcode == OP_F90_RANGE)
-	    return value_f90_subarray (arg1, exp, pos, noside);
-	  else
-	    {
-	      arg2 = evaluate_subexp_with_coercion (exp, pos, noside);
-	      return value_subscript (arg1, value_as_long (arg2));
-	    }
+	  return value_f90_subarray (arg1, exp, pos, nargs, noside);
 
 	case TYPE_CODE_PTR:
 	case TYPE_CODE_FUNC:
@@ -2239,49 +2423,6 @@ evaluate_subexp_standard (struct type *expect_type,
 	}
       return (arg1);
 
-    multi_f77_subscript:
-      {
-	LONGEST subscript_array[MAX_FORTRAN_DIMS];
-	int ndimensions = 1, i;
-	struct value *array = arg1;
-
-	if (nargs > MAX_FORTRAN_DIMS)
-	  error (_("Too many subscripts for F77 (%d Max)"), MAX_FORTRAN_DIMS);
-
-	ndimensions = calc_f77_array_dims (type);
-
-	if (nargs != ndimensions)
-	  error (_("Wrong number of subscripts"));
-
-	gdb_assert (nargs > 0);
-
-	/* Now that we know we have a legal array subscript expression 
-	   let us actually find out where this element exists in the array.  */
-
-	/* Take array indices left to right.  */
-	for (i = 0; i < nargs; i++)
-	  {
-	    /* Evaluate each subscript; it must be a legal integer in F77.  */
-	    arg2 = evaluate_subexp_with_coercion (exp, pos, noside);
-
-	    /* Fill in the subscript array.  */
-
-	    subscript_array[i] = value_as_long (arg2);
-	  }
-
-	/* Internal type of array is arranged right to left.  */
-	for (i = nargs; i > 0; i--)
-	  {
-	    struct type *array_type = check_typedef (value_type (array));
-	    LONGEST index = subscript_array[i - 1];
-
-	    array = value_subscripted_rvalue (array, index,
-					      f77_get_lowerbound (array_type));
-	  }
-
-	return array;
-      }
-
     case BINOP_LOGICAL_AND:
       arg1 = evaluate_subexp (NULL_TYPE, exp, pos, noside);
       if (noside == EVAL_SKIP)
@@ -2513,15 +2654,23 @@ evaluate_subexp_standard (struct type *expect_type,
       if (expect_type && TYPE_CODE (expect_type) == TYPE_CODE_PTR)
 	expect_type = TYPE_TARGET_TYPE (check_typedef (expect_type));
       arg1 = evaluate_subexp (expect_type, exp, pos, noside);
+      old_chain = make_cleanup (null_cleanup, 0);
+      object_address_set (value_raw_address (arg1));
       type = check_typedef (value_type (arg1));
       if (TYPE_CODE (type) == TYPE_CODE_METHODPTR
 	  || TYPE_CODE (type) == TYPE_CODE_MEMBERPTR)
 	error (_("Attempt to dereference pointer "
 		 "to member without an object"));
       if (noside == EVAL_SKIP)
-	goto nosideret;
+	{
+	  do_cleanups (old_chain);
+	  goto nosideret;
+	}
       if (unop_user_defined_p (op, arg1))
-	return value_x_unop (arg1, op, noside);
+	{
+	  do_cleanups (old_chain);
+	  return value_x_unop (arg1, op, noside);
+	}
       else if (noside == EVAL_AVOID_SIDE_EFFECTS)
 	{
 	  type = check_typedef (value_type (arg1));
@@ -2530,12 +2679,18 @@ evaluate_subexp_standard (struct type *expect_type,
 	  /* In C you can dereference an array to get the 1st elt.  */
 	      || TYPE_CODE (type) == TYPE_CODE_ARRAY
 	    )
-	    return value_zero (TYPE_TARGET_TYPE (type),
-			       lval_memory);
+	    {
+	      do_cleanups (old_chain);
+	      return value_zero (TYPE_TARGET_TYPE (type),
+				 lval_memory);
+	    }
 	  else if (TYPE_CODE (type) == TYPE_CODE_INT)
-	    /* GDB allows dereferencing an int.  */
-	    return value_zero (builtin_type (exp->gdbarch)->builtin_int,
-			       lval_memory);
+	    {
+	      do_cleanups (old_chain);
+	      /* GDB allows dereferencing an int.  */
+	      return value_zero (builtin_type (exp->gdbarch)->builtin_int,
+				 lval_memory);
+	    }
 	  else
 	    error (_("Attempt to take contents of a non-pointer value."));
 	}
@@ -2545,9 +2700,14 @@ evaluate_subexp_standard (struct type *expect_type,
 	 do.  "long long" variables are rare enough that
 	 BUILTIN_TYPE_LONGEST would seem to be a mistake.  */
       if (TYPE_CODE (type) == TYPE_CODE_INT)
-	return value_at_lazy (builtin_type (exp->gdbarch)->builtin_int,
-			      (CORE_ADDR) value_as_address (arg1));
-      return value_ind (arg1);
+	{
+	  do_cleanups (old_chain);
+	  return value_at_lazy (builtin_type (exp->gdbarch)->builtin_int,
+				(CORE_ADDR) value_as_address (arg1));
+	}
+      arg1 = value_ind (arg1);
+      do_cleanups (old_chain);
+      return arg1;
 
     case UNOP_ADDR:
       /* C++: check for and handle pointer to members.  */
@@ -2960,7 +3120,7 @@ evaluate_subexp_with_coercion (struct expression *exp,
 {
   enum exp_opcode op;
   int pc;
-  struct value *val;
+  struct value *val = NULL;
   struct symbol *var;
   struct type *type;
 
@@ -2971,13 +3131,18 @@ evaluate_subexp_with_coercion (struct expression *exp,
     {
     case OP_VAR_VALUE:
       var = exp->elts[pc + 2].symbol;
+      /* address_of_variable will call object_address_set for check_typedef.
+	 Call it only if required as it can error-out on VAR in register.  */
+      if (TYPE_DYNAMIC (SYMBOL_TYPE (var)))
+	val = address_of_variable (var, exp->elts[pc + 1].block);
       type = check_typedef (SYMBOL_TYPE (var));
       if (TYPE_CODE (type) == TYPE_CODE_ARRAY
 	  && !TYPE_VECTOR (type)
 	  && CAST_IS_CONVERSION (exp->language_defn))
 	{
 	  (*pos) += 4;
-	  val = address_of_variable (var, exp->elts[pc + 1].block);
+	  if (!val)
+	    val = address_of_variable (var, exp->elts[pc + 1].block);
 	  return value_cast (lookup_pointer_type (TYPE_TARGET_TYPE (type)),
 			     val);
 	}
@@ -3035,9 +3200,13 @@ evaluate_subexp_for_sizeof (struct expression *exp, int *pos)
 
     case OP_VAR_VALUE:
       (*pos) += 4;
-      type = check_typedef (SYMBOL_TYPE (exp->elts[pc + 2].symbol));
-      return
-	value_from_longest (size_type, (LONGEST) TYPE_LENGTH (type));
+      /* We do not need to call read_var_value but the object evaluation may
+	 need to have executed object_address_set which needs valid
+	 SYMBOL_VALUE_ADDRESS of the symbol.  Still VALUE returned by
+	 read_var_value we left as lazy.  */
+      type = value_type (read_var_value (exp->elts[pc + 2].symbol,
+					deprecated_safe_get_selected_frame ()));
+      return value_from_longest (size_type, (LONGEST) TYPE_LENGTH (type));
 
     default:
       val = evaluate_subexp (NULL_TYPE, exp, pos, EVAL_AVOID_SIDE_EFFECTS);
@@ -3068,18 +3237,25 @@ parse_and_eval_type (char *p, int length)
 int
 calc_f77_array_dims (struct type *array_type)
 {
-  int ndimen = 1;
-  struct type *tmp_type;
-
-  if ((TYPE_CODE (array_type) != TYPE_CODE_ARRAY))
-    error (_("Can't get dimensions for a non-array type"));
-
-  tmp_type = array_type;
-
-  while ((tmp_type = TYPE_TARGET_TYPE (tmp_type)))
+  switch (TYPE_CODE (array_type))
     {
-      if (TYPE_CODE (tmp_type) == TYPE_CODE_ARRAY)
-	++ndimen;
+    case TYPE_CODE_STRING:
+      return 1;
+
+    case TYPE_CODE_ARRAY:
+      {
+	int ndimen = 1;
+
+	while ((array_type = TYPE_TARGET_TYPE (array_type)))
+	  {
+	    if (TYPE_CODE (array_type) == TYPE_CODE_ARRAY)
+	      ++ndimen;
+	  }
+	return ndimen;
+      }
+
+    default:
+      error (_("Can't get dimensions for a non-array/non-string type"));
     }
-  return ndimen;
+
 }

@@ -17,6 +17,13 @@
 
 int array[] = {1, 2, 3, 4};
 
+#ifdef __GNUC__
+struct
+  {
+    int a[0];
+  } unbound;
+#endif
+
 int
 main (void)
 {

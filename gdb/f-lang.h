@@ -29,6 +29,10 @@ extern void f_error (char *);	/* Defined in f-exp.y */
 extern void f_print_type (struct type *, const char *, struct ui_file *, int,
 			  int, const struct type_print_options *);
 
+extern const char *f_object_address_data_valid_print_to_stream
+  (struct type *type, struct ui_file *stream);
+extern void f_object_address_data_valid_or_error (struct type *type);
+
 extern void f_val_print (struct type *, const gdb_byte *, int, CORE_ADDR,
 			 struct ui_file *, int,
 			 const struct value *,

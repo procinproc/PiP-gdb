@@ -1624,6 +1624,9 @@ static void fill_in_loclist_baton (struct dwarf2_cu *cu,
 				   struct dwarf2_loclist_baton *baton,
 				   struct attribute *attr);
 
+static struct dwarf2_loclist_baton *dwarf2_attr_to_loclist_baton
+  (struct attribute *attr, struct dwarf2_cu *cu);
+
 static void dwarf2_symbol_mark_computed (struct attribute *attr,
 					 struct symbol *sym,
 					 struct dwarf2_cu *cu);
@@ -1656,6 +1659,9 @@ static void age_cached_comp_units (void);
 
 static void free_one_cached_comp_unit (struct dwarf2_per_cu_data *);
 
+static void fetch_die_type_attrs (struct die_info *die, struct type *type,
+				  struct dwarf2_cu *cu);
+
 static struct type *set_die_type (struct die_info *, struct type *,
 				  struct dwarf2_cu *);
 
@@ -1683,6 +1689,9 @@ static struct type *get_die_type_at_offset (sect_offset,
 					    struct dwarf2_per_cu_data *per_cu);
 
 static struct type *get_die_type (struct die_info *die, struct dwarf2_cu *cu);
+
+static struct dwarf2_locexpr_baton *dwarf2_attr_to_locexpr_baton
+  (struct attribute *attr, struct dwarf2_cu *cu);
 
 static void dwarf2_release_queue (void *dummy);
 
@@ -11708,6 +11717,29 @@ process_enumeration_scope (struct die_info *die, struct dwarf2_cu *cu)
   new_symbol (die, this_type, cu);
 }
 
+/* Create a new array dimension referencing its target type TYPE.
+
+   Multidimensional arrays are internally represented as a stack of
+   singledimensional arrays being referenced by their TYPE_TARGET_TYPE.  */
+
+static struct type *
+create_single_array_dimension (struct type *type, struct type *range_type,
+			       struct die_info *die, struct dwarf2_cu *cu)
+{
+  type = create_array_type (NULL, type, range_type);
+
+  /* These generic type attributes need to be fetched by
+     evaluate_subexp_standard <multi_f77_subscript>'s call of
+     value_subscripted_rvalue only for the innermost array type.  */
+  fetch_die_type_attrs (die, type, cu);
+
+  /* These generic type attributes are checked for allocated/associated
+     validity while accessing FIELD_LOC_KIND_DWARF_BLOCK.  */
+  fetch_die_type_attrs (die, range_type, cu);
+
+  return type;
+}
+
 /* Extract all information from a DW_TAG_array_type DIE and put it in
    the DIE's type field.  For now, this only handles one dimensional
    arrays.  */
@@ -11721,7 +11753,7 @@ read_array_type (struct die_info *die, struct dwarf2_cu *cu)
   struct type *element_type, *range_type, *index_type;
   struct type **range_types = NULL;
   struct attribute *attr;
-  int ndim = 0;
+  int ndim = 0, i;
   struct cleanup *back_to;
   const char *name;
 
@@ -11774,17 +11806,19 @@ read_array_type (struct die_info *die, struct dwarf2_cu *cu)
   type = element_type;
 
   if (read_array_order (die, cu) == DW_ORD_col_major)
-    {
-      int i = 0;
+    for (i = 0; i < ndim; i++)
+      type = create_single_array_dimension (type, range_types[i], die, cu);
+  else /* (read_array_order (die, cu) == DW_ORD_row_major) */
+    for (i = ndim - 1; i >= 0; i--)
+      type = create_single_array_dimension (type, range_types[i], die, cu);
 
-      while (i < ndim)
-	type = create_array_type (NULL, type, range_types[i++]);
-    }
-  else
-    {
-      while (ndim-- > 0)
-	type = create_array_type (NULL, type, range_types[ndim]);
-    }
+  /* Data locations should be set only for the outermost dimension as they
+     would be confusing for the dereferenced offset on the inner ones.  */
+  attr = dwarf2_attr (die, DW_AT_data_location, cu);
+  if (attr_form_is_block (attr))
+    TYPE_DATA_LOCATION_DWARF_BLOCK (type)
+      = dwarf2_attr_to_locexpr_baton (attr, cu);
+  gdb_assert (!TYPE_DATA_LOCATION_IS_ADDR (type));
 
   /* Understand Dwarf2 support for vector types (like they occur on
      the PowerPC w/ AltiVec).  Gcc just adds another attribute to the
@@ -12419,29 +12453,114 @@ read_tag_string_type (struct die_info *die, struct dwarf2_cu *cu)
   struct gdbarch *gdbarch = get_objfile_arch (objfile);
   struct type *type, *range_type, *index_type, *char_type;
   struct attribute *attr;
-  unsigned int length;
+  int length;
+
+  index_type = objfile_type (objfile)->builtin_int;
+  /* RANGE_TYPE is allocated from OBJFILE, not as a permanent type.  */
+  range_type = alloc_type (objfile);
+  /* LOW_BOUND and HIGH_BOUND are set for real below.  */
+  range_type = create_range_type (range_type, index_type, 0, -1);
+
+  /* C/C++ should probably have the low bound 0 but C/C++ does not use
+     DW_TAG_string_type.  */
+  TYPE_LOW_BOUND (range_type) = 1;
 
   attr = dwarf2_attr (die, DW_AT_string_length, cu);
-  if (attr)
+  if (attr && attr_form_is_block (attr))
     {
-      length = DW_UNSND (attr);
+      /* Security check for a size overflow.  */
+      if (DW_BLOCK (attr)->size + 2 < DW_BLOCK (attr)->size)
+	TYPE_HIGH_BOUND (range_type) = 1;
+      /* Extend the DWARF block by a new DW_OP_deref/DW_OP_deref_size
+	 instruction as DW_AT_string_length specifies the length location, not
+	 its value.  */
+      else
+	{
+	  struct dwarf2_locexpr_baton *length_baton = NULL;
+	  struct dwarf_block *blk = DW_BLOCK (attr);
+
+	  /* Turn any single DW_OP_reg* into DW_OP_breg*(0) but clearing
+	     DW_OP_deref* in such case.  */
+
+	  if (blk->size == 1 && blk->data[0] >= DW_OP_reg0
+	      && blk->data[0] <= DW_OP_reg31)
+	    length_baton = dwarf2_attr_to_locexpr_baton (attr, cu);
+	  else if (blk->size > 1 && blk->data[0] == DW_OP_regx)
+	    {
+	      ULONGEST ulongest;
+	      const gdb_byte *end;
+
+	      end = safe_read_uleb128 (&blk->data[1], &blk->data[blk->size],
+				       &ulongest);
+	      if (end == &blk->data[blk->size])
+		length_baton = dwarf2_attr_to_locexpr_baton (attr, cu);
+	    }
+
+	  if (length_baton == NULL)
+	    {
+	      struct attribute *size_attr;
+	      gdb_byte *data;
+
+	      length_baton = obstack_alloc (&cu->comp_unit_obstack,
+					    sizeof (*length_baton));
+	      length_baton->per_cu = cu->per_cu;
+	      length_baton->size = DW_BLOCK (attr)->size + 2;
+	      data = obstack_alloc (&cu->comp_unit_obstack,
+				    length_baton->size);
+	      length_baton->data = data;
+	      memcpy (data, DW_BLOCK (attr)->data, DW_BLOCK (attr)->size);
+
+	      /* DW_AT_BYTE_SIZE existing together with DW_AT_STRING_LENGTH
+		 specifies the size of an integer to fetch.  */
+	      size_attr = dwarf2_attr (die, DW_AT_byte_size, cu);
+	      if (size_attr)
+		{
+		  data[DW_BLOCK (attr)->size] = DW_OP_deref_size;
+		  data[DW_BLOCK (attr)->size + 1] = DW_UNSND (size_attr);
+		  if (data[DW_BLOCK (attr)->size + 1] != DW_UNSND (size_attr))
+		    complaint (&symfile_complaints,
+			       _("DW_AT_string_length's DW_AT_byte_size "
+				 "integer exceeds the byte size storage"));
+		}
+	      else
+		{
+		  data[DW_BLOCK (attr)->size] = DW_OP_deref;
+		  data[DW_BLOCK (attr)->size + 1] = DW_OP_nop;
+		}
+	    }
+
+	  TYPE_RANGE_DATA (range_type)->high.kind
+	    = RANGE_BOUND_KIND_DWARF_BLOCK;
+	  TYPE_RANGE_DATA (range_type)->high.u.dwarf_block = length_baton;
+	  TYPE_DYNAMIC (range_type) = 1;
+	}
     }
   else
     {
-      /* Check for the DW_AT_byte_size attribute.  */
+      if (attr && attr_form_is_constant (attr))
+	{
+	  /* We currently do not support a constant address where the location
+	     should be read from - attr_form_is_block is expected instead.  See
+	     DWARF for the DW_AT_STRING_LENGTH vs. DW_AT_BYTE_SIZE difference.
+	     */
+	  /* PASSTHRU */
+	}
+
       attr = dwarf2_attr (die, DW_AT_byte_size, cu);
-      if (attr)
-        {
-          length = DW_UNSND (attr);
-        }
+      if (attr && attr_form_is_block (attr))
+	{
+	  TYPE_RANGE_DATA (range_type)->high.kind
+	    = RANGE_BOUND_KIND_DWARF_BLOCK;
+	  TYPE_RANGE_DATA (range_type)->high.u.dwarf_block =
+					dwarf2_attr_to_locexpr_baton (attr, cu);
+	  TYPE_DYNAMIC (range_type) = 1;
+	}
+      else if (attr && attr_form_is_constant (attr))
+	TYPE_HIGH_BOUND (range_type) = dwarf2_get_attr_constant_value (attr, 0);
       else
-        {
-          length = 1;
-        }
+	TYPE_HIGH_BOUND (range_type) = 1;
     }
 
-  index_type = objfile_type (objfile)->builtin_int;
-  range_type = create_range_type (NULL, index_type, 1, length);
   char_type = language_string_char_type (cu->language_defn, gdbarch);
   type = create_string_type (NULL, char_type, range_type);
 
@@ -12745,7 +12864,7 @@ read_subrange_type (struct die_info *die, struct dwarf2_cu *cu)
   struct type *base_type, *orig_base_type;
   struct type *range_type;
   struct attribute *attr;
-  LONGEST low, high;
+  LONGEST low;
   int low_default_is_valid;
   const char *name;
   LONGEST negative_mask;
@@ -12804,42 +12923,6 @@ read_subrange_type (struct die_info *die, struct dwarf2_cu *cu)
 				      "- DIE at 0x%x [in module %s]"),
 	       die->offset.sect_off, cu->objfile->name);
 
-  attr = dwarf2_attr (die, DW_AT_upper_bound, cu);
-  if (attr)
-    {
-      if (attr_form_is_block (attr) || is_ref_attr (attr))
-        {
-          /* GCC encodes arrays with unspecified or dynamic length
-             with a DW_FORM_block1 attribute or a reference attribute.
-             FIXME: GDB does not yet know how to handle dynamic
-             arrays properly, treat them as arrays with unspecified
-             length for now.
-
-             FIXME: jimb/2003-09-22: GDB does not really know
-             how to handle arrays of unspecified length
-             either; we just represent them as zero-length
-             arrays.  Choose an appropriate upper bound given
-             the lower bound we've computed above.  */
-          high = low - 1;
-        }
-      else
-        high = dwarf2_get_attr_constant_value (attr, 1);
-    }
-  else
-    {
-      attr = dwarf2_attr (die, DW_AT_count, cu);
-      if (attr)
-	{
-	  int count = dwarf2_get_attr_constant_value (attr, 1);
-	  high = low + count - 1;
-	}
-      else
-	{
-	  /* Unspecified array length.  */
-	  high = low - 1;
-	}
-    }
-
   /* Dwarf-2 specifications explicitly allows to create subrange types
      without specifying a base type.
      In that case, the base type must be set to the type of
@@ -12878,24 +12961,163 @@ read_subrange_type (struct die_info *die, struct dwarf2_cu *cu)
 	}
     }
 
-  negative_mask =
+  /* LOW_BOUND and HIGH_BOUND are set for real below.  */
+  range_type = create_range_type (NULL, orig_base_type, 0, -1);
+  TYPE_UNSIGNED (range_type) = 0;
+
+  negative_mask = 
     (LONGEST) -1 << (TYPE_LENGTH (base_type) * TARGET_CHAR_BIT - 1);
-  if (!TYPE_UNSIGNED (base_type) && (low & negative_mask))
-    low |= negative_mask;
-  if (!TYPE_UNSIGNED (base_type) && (high & negative_mask))
-    high |= negative_mask;
 
-  range_type = create_range_type (NULL, orig_base_type, low, high);
+  /* Exclude language_ada from any TYPE_DYNAMIC constructs below.  GDB Ada
+     supports implements the dynamic bounds in a non-DWARF way and the
+     existing DWARF dynamic bounds are invalid, leading to memory access
+     errors.  */
 
-  /* Mark arrays with dynamic length at least as an array of unspecified
-     length.  GDB could check the boundary but before it gets implemented at
-     least allow accessing the array elements.  */
-  if (attr && attr_form_is_block (attr))
-    TYPE_HIGH_BOUND_UNDEFINED (range_type) = 1;
+  attr = dwarf2_attr (die, DW_AT_lower_bound, cu);
+  if (attr && attr_form_is_block (attr) && cu->language != language_ada)
+    {
+      TYPE_RANGE_DATA (range_type)->low.kind = RANGE_BOUND_KIND_DWARF_BLOCK;
+      TYPE_RANGE_DATA (range_type)->low.u.dwarf_block =
+					dwarf2_attr_to_locexpr_baton (attr, cu);
+      TYPE_DYNAMIC (range_type) = 1;
+      /* For setting a default if DW_AT_UPPER_BOUND would be missing.  */
+      low = 0;
+    }
+  else if (attr && is_ref_attr (attr) && cu->language != language_ada)
+    {
+      struct die_info *target_die;
+      struct dwarf2_cu *target_cu = cu;
+      struct attribute *target_loc_attr;
 
-  /* Ada expects an empty array on no boundary attributes.  */
-  if (attr == NULL && cu->language != language_ada)
-    TYPE_HIGH_BOUND_UNDEFINED (range_type) = 1;
+      target_die = follow_die_ref_or_sig (die, attr, &target_cu);
+      gdb_assert (target_cu->objfile == cu->objfile);
+      target_loc_attr = dwarf2_attr (target_die, DW_AT_location, target_cu);
+
+      TYPE_RANGE_DATA (range_type)->low.kind = RANGE_BOUND_KIND_DWARF_LOCLIST;
+      TYPE_RANGE_DATA (range_type)->low.u.dwarf_loclist.loclist
+        = dwarf2_attr_to_loclist_baton (target_loc_attr, target_cu);
+      TYPE_RANGE_DATA (range_type)->low.u.dwarf_loclist.type
+        = die_type (target_die, target_cu);
+      TYPE_DYNAMIC (range_type) = 1;
+      /* For setting a default if DW_AT_UPPER_BOUND would be missing.  */
+      low = 0;
+    }
+  else
+    {
+      if (attr && attr_form_is_constant (attr))
+	low = dwarf2_get_attr_constant_value (attr, 0);
+      else
+	{
+	  if (cu->language == language_fortran)
+	    {
+	      /* FORTRAN implies a lower bound of 1, if not given.  */
+	      low = 1;
+	    }
+	  else
+	    {
+	      /* According to DWARF we should assume the value 0 only for
+		 LANGUAGE_C and LANGUAGE_CPLUS.  */
+	      low = 0;
+	    }
+	}
+      if (!TYPE_UNSIGNED (base_type) && (low & negative_mask))
+	low |= negative_mask;
+      TYPE_LOW_BOUND (range_type) = low;
+      if (low >= 0)
+	TYPE_UNSIGNED (range_type) = 1;
+    }
+
+  attr = dwarf2_attr (die, DW_AT_upper_bound, cu);
+  if (!attr || (!attr_form_is_block (attr) && !attr_form_is_constant (attr)
+		&& !is_ref_attr (attr)))
+    {
+      attr = dwarf2_attr (die, DW_AT_count, cu);
+      /* It does not hurt but it is needlessly ineffective in check_typedef.  */
+      if (attr && (attr_form_is_block (attr) || attr_form_is_constant (attr)))
+      	{
+	  TYPE_RANGE_HIGH_BOUND_IS_COUNT (range_type) = 1;
+	  TYPE_DYNAMIC (range_type) = 1;
+	}
+      /* Pass it now as the regular DW_AT_upper_bound.  */
+    }
+
+  if (attr && attr_form_is_block (attr) && cu->language != language_ada)
+    {
+      TYPE_RANGE_DATA (range_type)->high.kind = RANGE_BOUND_KIND_DWARF_BLOCK;
+      TYPE_RANGE_DATA (range_type)->high.u.dwarf_block =
+					dwarf2_attr_to_locexpr_baton (attr, cu);
+      TYPE_DYNAMIC (range_type) = 1;
+    }
+  else if (attr && is_ref_attr (attr) && cu->language != language_ada)
+    {
+      struct die_info *target_die;
+      struct dwarf2_cu *target_cu = cu;
+      struct attribute *target_loc_attr;
+
+      target_die = follow_die_ref_or_sig (die, attr, &target_cu);
+      gdb_assert (target_cu->objfile == cu->objfile);
+      target_loc_attr = dwarf2_attr (target_die, DW_AT_location, target_cu);
+
+      TYPE_RANGE_DATA (range_type)->high.kind = RANGE_BOUND_KIND_DWARF_LOCLIST;
+      TYPE_RANGE_DATA (range_type)->high.u.dwarf_loclist.loclist
+        = dwarf2_attr_to_loclist_baton (target_loc_attr, target_cu);
+      TYPE_RANGE_DATA (range_type)->high.u.dwarf_loclist.type
+        = die_type (target_die, target_cu);
+      TYPE_DYNAMIC (range_type) = 1;
+    }
+  else
+    {
+      LONGEST high;
+
+      if (attr && attr_form_is_constant (attr))
+	high = dwarf2_get_attr_constant_value (attr, 0);
+      else
+	{
+	  /* Ada expects an empty array on no boundary attributes.  */
+	  if (cu->language != language_ada)
+	    TYPE_HIGH_BOUND_UNDEFINED (range_type) = 1;
+	  high = low - 1;
+	}
+      if (!TYPE_UNSIGNED (base_type) && (high & negative_mask))
+	high |= negative_mask;
+      TYPE_HIGH_BOUND (range_type) = high;
+    }
+
+  /* DW_AT_bit_stride is currently unsupported as we count in bytes.  */
+  attr = dwarf2_attr (die, DW_AT_byte_stride, cu);
+  if (attr && attr_form_is_block (attr) && cu->language != language_ada)
+    {
+      TYPE_RANGE_DATA (range_type)->byte_stride.kind
+        = RANGE_BOUND_KIND_DWARF_BLOCK;
+      TYPE_RANGE_DATA (range_type)->byte_stride.u.dwarf_block =
+					dwarf2_attr_to_locexpr_baton (attr, cu);
+      TYPE_DYNAMIC (range_type) = 1;
+    }
+  else if (attr && is_ref_attr (attr) && cu->language != language_ada)
+    {
+      struct die_info *target_die;
+      struct dwarf2_cu *target_cu = cu;
+      struct attribute *target_loc_attr;
+
+      target_die = follow_die_ref_or_sig (die, attr, &target_cu);
+      gdb_assert (target_cu->objfile == cu->objfile);
+      target_loc_attr = dwarf2_attr (target_die, DW_AT_location, target_cu);
+
+      TYPE_RANGE_DATA (range_type)->byte_stride.kind
+        = RANGE_BOUND_KIND_DWARF_LOCLIST;
+      TYPE_RANGE_DATA (range_type)->byte_stride.u.dwarf_loclist.loclist
+        = dwarf2_attr_to_loclist_baton (target_loc_attr, target_cu);
+      TYPE_RANGE_DATA (range_type)->byte_stride.u.dwarf_loclist.type
+        = die_type (target_die, target_cu);
+      TYPE_DYNAMIC (range_type) = 1;
+    }
+  else if (attr && attr_form_is_constant (attr))
+    {
+      TYPE_BYTE_STRIDE (range_type) = dwarf2_get_attr_constant_value (attr, 0);
+      if (TYPE_BYTE_STRIDE (range_type) == 0)
+	complaint (&symfile_complaints,
+		   _("Found DW_AT_byte_stride with unsupported value 0"));
+    }
 
   name = dwarf2_name (die, cu);
   if (name)
@@ -15755,10 +15977,12 @@ var_decode_location (struct attribute *attr, struct symbol *sym,
      (i.e. when the value of a register or memory location is
      referenced, or a thread-local block, etc.).  Then again, it might
      not be worthwhile.  I'm assuming that it isn't unless performance
-     or memory numbers show me otherwise.  */
+     or memory numbers show me otherwise.
+     
+     SYMBOL_CLASS may get overriden by dwarf2_symbol_mark_computed.  */
 
-  dwarf2_symbol_mark_computed (attr, sym, cu);
   SYMBOL_CLASS (sym) = LOC_COMPUTED;
+  dwarf2_symbol_mark_computed (attr, sym, cu);
 
   if (SYMBOL_COMPUTED_OPS (sym) == &dwarf2_loclist_funcs)
     cu->has_loclist = 1;
@@ -15799,6 +16023,8 @@ new_symbol_full (struct die_info *die, struct type *type, struct dwarf2_cu *cu,
       else
 	sym = OBSTACK_ZALLOC (&objfile->objfile_obstack, struct symbol);
       OBJSTAT (objfile, n_syms++);
+      /* Some methods are called w/o checking SYMBOL_COMPUTED_OPS validity.  */
+      SYMBOL_COMPUTED_OPS (sym) = &dwarf2_missing_funcs;
 
       /* Cache this symbol's name and the name's demangled form (if any).  */
       SYMBOL_SET_LANGUAGE (sym, cu->language);
@@ -16607,6 +16833,9 @@ read_type_die_1 (struct die_info *die, struct dwarf2_cu *cu)
 		 dwarf_tag_name (die->tag));
       break;
     }
+
+  if (this_type)
+    finalize_type (this_type);
 
   return this_type;
 }
@@ -19052,62 +19281,100 @@ fill_in_loclist_baton (struct dwarf2_cu *cu,
   baton->from_dwo = cu->dwo_unit != NULL;
 }
 
+/* Convert DW_BLOCK into struct dwarf2_locexpr_baton.  ATTR must be a DW_BLOCK
+   attribute type.  */
+
+static struct dwarf2_locexpr_baton *
+dwarf2_attr_to_locexpr_baton (struct attribute *attr, struct dwarf2_cu *cu)
+{
+  struct objfile *objfile = dwarf2_per_objfile->objfile;
+  struct dwarf2_locexpr_baton *baton;
+
+  gdb_assert (attr_form_is_block (attr));
+
+  baton = obstack_alloc (&objfile->objfile_obstack, sizeof (*baton));
+  baton->per_cu = cu->per_cu;
+  gdb_assert (baton->per_cu);
+
+  /* Note that we're just copying the block's data pointer
+     here, not the actual data.  We're still pointing into the
+     info_buffer for SYM's objfile; right now we never release
+     that buffer, but when we do clean up properly this may
+     need to change.  */
+  baton->size = DW_BLOCK (attr)->size;
+  baton->data = DW_BLOCK (attr)->data;
+  gdb_assert (baton->size == 0 || baton->data != NULL);
+
+  return baton;
+}
+
+static struct dwarf2_loclist_baton *
+dwarf2_attr_to_loclist_baton (struct attribute *attr, struct dwarf2_cu *cu)
+{
+  struct objfile *objfile = dwarf2_per_objfile->objfile;
+  struct dwarf2_section_info *section = cu_debug_loc_section (cu);
+  struct dwarf2_loclist_baton *baton;
+
+  /* DW_AT_location of the referenced DIE may be missing if the referenced
+     variable has been optimized out.  */
+  if (!attr)
+    return NULL;
+
+  dwarf2_read_section (dwarf2_per_objfile->objfile, section);
+
+  if (!(attr_form_is_section_offset (attr)
+      /* .debug_loc{,.dwo} may not exist at all, or the offset may be outside
+	 the section.  If so, fall through to the complaint in the
+	 other branch.  */
+      && DW_UNSND (attr) < dwarf2_section_size (objfile, section)))
+    return NULL;
+
+  baton = obstack_alloc (&objfile->objfile_obstack,
+			 sizeof (struct dwarf2_loclist_baton));
+
+  fill_in_loclist_baton (cu, baton, attr);
+
+  if (cu->base_known == 0)
+    complaint (&symfile_complaints,
+	       _("Location list used without "
+		 "specifying the CU base address."));
+
+  return baton;
+}
+
+/* SYM may get its SYMBOL_CLASS overriden on invalid ATTR content.  */
+
 static void
 dwarf2_symbol_mark_computed (struct attribute *attr, struct symbol *sym,
 			     struct dwarf2_cu *cu)
 {
-  struct objfile *objfile = dwarf2_per_objfile->objfile;
-  struct dwarf2_section_info *section = cu_debug_loc_section (cu);
+  struct dwarf2_loclist_baton *loclist_baton;
 
-  if (attr_form_is_section_offset (attr)
-      /* .debug_loc{,.dwo} may not exist at all, or the offset may be outside
-	 the section.  If so, fall through to the complaint in the
-	 other branch.  */
-      && DW_UNSND (attr) < dwarf2_section_size (objfile, section))
+  loclist_baton = dwarf2_attr_to_loclist_baton (attr, cu);
+  if (loclist_baton)
     {
-      struct dwarf2_loclist_baton *baton;
-
-      baton = obstack_alloc (&objfile->objfile_obstack,
-			     sizeof (struct dwarf2_loclist_baton));
-
-      fill_in_loclist_baton (cu, baton, attr);
-
-      if (cu->base_known == 0)
-	complaint (&symfile_complaints,
-		   _("Location list used without "
-		     "specifying the CU base address."));
-
       SYMBOL_COMPUTED_OPS (sym) = &dwarf2_loclist_funcs;
-      SYMBOL_LOCATION_BATON (sym) = baton;
+      SYMBOL_LOCATION_BATON (sym) = loclist_baton;
+    }
+  else if (attr_form_is_block (attr))
+    {
+      SYMBOL_COMPUTED_OPS (sym) = &dwarf2_locexpr_funcs;
+      SYMBOL_LOCATION_BATON (sym) = dwarf2_attr_to_locexpr_baton (attr, cu);
     }
   else
     {
-      struct dwarf2_locexpr_baton *baton;
+      dwarf2_invalid_attrib_class_complaint ("location description",
+					     SYMBOL_NATURAL_NAME (sym));
 
-      baton = obstack_alloc (&objfile->objfile_obstack,
-			     sizeof (struct dwarf2_locexpr_baton));
-      baton->per_cu = cu->per_cu;
-      gdb_assert (baton->per_cu);
+      /* Some methods are called w/o checking SYMBOL_COMPUTED_OPS validity.  */
 
-      if (attr_form_is_block (attr))
-	{
-	  /* Note that we're just copying the block's data pointer
-	     here, not the actual data.  We're still pointing into the
-	     info_buffer for SYM's objfile; right now we never release
-	     that buffer, but when we do clean up properly this may
-	     need to change.  */
-	  baton->size = DW_BLOCK (attr)->size;
-	  baton->data = DW_BLOCK (attr)->data;
-	}
-      else
-	{
-	  dwarf2_invalid_attrib_class_complaint ("location description",
-						 SYMBOL_NATURAL_NAME (sym));
-	  baton->size = 0;
-	}
+      SYMBOL_COMPUTED_OPS (sym) = &dwarf2_missing_funcs;
+      SYMBOL_LOCATION_BATON (sym) = NULL;
 
-      SYMBOL_COMPUTED_OPS (sym) = &dwarf2_locexpr_funcs;
-      SYMBOL_LOCATION_BATON (sym) = baton;
+      /* For functions a missing DW_AT_frame_base does not optimize out the
+	 whole function definition, only its frame base resolving.  */
+      if (attr->name == DW_AT_location)
+	SYMBOL_CLASS (sym) = LOC_OPTIMIZED_OUT;
     }
 }
 
@@ -19478,6 +19745,25 @@ per_cu_offset_and_type_eq (const void *item_lhs, const void *item_rhs)
 	  && ofs_lhs->offset.sect_off == ofs_rhs->offset.sect_off);
 }
 
+/* Fill in generic attributes applicable for type DIEs.  */
+
+static void
+fetch_die_type_attrs (struct die_info *die, struct type *type,
+		      struct dwarf2_cu *cu)
+{
+  struct attribute *attr;
+
+  attr = dwarf2_attr (die, DW_AT_allocated, cu);
+  if (attr_form_is_block (attr))
+    TYPE_ALLOCATED (type) = dwarf2_attr_to_locexpr_baton (attr, cu);
+  gdb_assert (!TYPE_NOT_ALLOCATED (type));
+
+  attr = dwarf2_attr (die, DW_AT_associated, cu);
+  if (attr_form_is_block (attr))
+    TYPE_ASSOCIATED (type) = dwarf2_attr_to_locexpr_baton (attr, cu);
+  gdb_assert (!TYPE_NOT_ASSOCIATED (type));
+}
+
 /* Set the type associated with DIE to TYPE.  Save it in CU's hash
    table if necessary.  For convenience, return TYPE.
 
@@ -19501,6 +19787,8 @@ set_die_type (struct die_info *die, struct type *type, struct dwarf2_cu *cu)
 {
   struct dwarf2_per_cu_offset_and_type **slot, ofs;
   struct objfile *objfile = cu->objfile;
+
+  fetch_die_type_attrs (die, type, cu);
 
   /* For Ada types, make sure that the gnat-specific data is always
      initialized (if not already set).  There are a few types where

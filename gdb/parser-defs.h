@@ -244,6 +244,8 @@ extern void operator_length_standard (const struct expression *, int, int *,
 				      int *);
 
 extern int operator_check_standard (struct expression *exp, int pos,
+				    int (*type_func) (struct type *type,
+						      void *data),
 				    int (*objfile_func)
 				      (struct objfile *objfile, void *data),
 				    void *data);
@@ -330,6 +332,7 @@ struct exp_descriptor
        value should be immediately returned to the caller.  Otherwise zero
        should be returned.  */
     int (*operator_check) (struct expression *exp, int pos,
+			   int (*type_func) (struct type *type, void *data),
 			   int (*objfile_func) (struct objfile *objfile,
 						void *data),
 			   void *data);

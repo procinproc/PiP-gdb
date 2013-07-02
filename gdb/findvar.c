@@ -34,6 +34,7 @@
 #include "block.h"
 #include "objfiles.h"
 #include "language.h"
+#include "dwarf2loc.h"
 
 /* Basic byte-swapping routines.  All 'extract' functions return a
    host-format integer from a target-format integer at ADDR which is
@@ -437,7 +438,10 @@ minsym_lookup_iterator_cb (struct objfile *objfile, void *cb_data)
 }
 
 /* A default implementation for the "la_read_var_value" hook in
-   the language vector which should work in most situations.  */
+   the language vector which should work in most situations.
+   We have to first find the address of the variable before allocating struct
+   value to return as its size may depend on DW_OP_PUSH_OBJECT_ADDRESS possibly 
+   used by its type.  */
 
 struct value *
 default_read_var_value (struct symbol *var, struct frame_info *frame)
@@ -445,13 +449,6 @@ default_read_var_value (struct symbol *var, struct frame_info *frame)
   struct value *v;
   struct type *type = SYMBOL_TYPE (var);
   CORE_ADDR addr;
-
-  /* Call check_typedef on our type to make sure that, if TYPE is
-     a TYPE_CODE_TYPEDEF, its length is set to the length of the target type
-     instead of zero.  However, we do not replace the typedef type by the
-     target type, because we want to keep the typedef in order to be able to
-     set the returned value type description correctly.  */
-  check_typedef (type);
 
   if (symbol_read_needs_frame (var))
     gdb_assert (frame);
@@ -492,7 +489,6 @@ default_read_var_value (struct symbol *var, struct frame_info *frame)
       return v;
 
     case LOC_STATIC:
-      v = allocate_value_lazy (type);
       if (overlay_debugging)
 	addr = symbol_overlayed_address (SYMBOL_VALUE_ADDRESS (var),
 					 SYMBOL_OBJ_SECTION (var));
@@ -506,7 +502,6 @@ default_read_var_value (struct symbol *var, struct frame_info *frame)
 	error (_("Unknown argument list address for `%s'."),
 	       SYMBOL_PRINT_NAME (var));
       addr += SYMBOL_VALUE (var);
-      v = allocate_value_lazy (type);
       break;
 
     case LOC_REF_ARG:
@@ -521,14 +516,12 @@ default_read_var_value (struct symbol *var, struct frame_info *frame)
 	argref += SYMBOL_VALUE (var);
 	ref = value_at (lookup_pointer_type (type), argref);
 	addr = value_as_address (ref);
-	v = allocate_value_lazy (type);
 	break;
       }
 
     case LOC_LOCAL:
       addr = get_frame_locals_address (frame);
       addr += SYMBOL_VALUE (var);
-      v = allocate_value_lazy (type);
       break;
 
     case LOC_TYPEDEF:
@@ -537,7 +530,6 @@ default_read_var_value (struct symbol *var, struct frame_info *frame)
       break;
 
     case LOC_BLOCK:
-      v = allocate_value_lazy (type);
       if (overlay_debugging)
 	addr = symbol_overlayed_address
 	  (BLOCK_START (SYMBOL_BLOCK_VALUE (var)), SYMBOL_OBJ_SECTION (var));
@@ -563,7 +555,6 @@ default_read_var_value (struct symbol *var, struct frame_info *frame)
 	             SYMBOL_PRINT_NAME (var));
 
 	    addr = value_as_address (regval);
-	    v = allocate_value_lazy (type);
 	  }
 	else
 	  {
@@ -612,7 +603,6 @@ default_read_var_value (struct symbol *var, struct frame_info *frame)
 	if (obj_section
 	    && (obj_section->the_bfd_section->flags & SEC_THREAD_LOCAL) != 0)
 	  addr = target_translate_tls_address (obj_section->objfile, addr);
-	v = allocate_value_lazy (type);
       }
       break;
 
@@ -625,6 +615,10 @@ default_read_var_value (struct symbol *var, struct frame_info *frame)
       break;
     }
 
+  /* ADDR is set here for ALLOCATE_VALUE's CHECK_TYPEDEF for
+     DW_OP_PUSH_OBJECT_ADDRESS.  */
+  object_address_set (addr);
+  v = allocate_value_lazy (type);
   VALUE_LVAL (v) = lval_memory;
   set_value_address (v, addr);
   return v;
@@ -729,10 +723,11 @@ struct value *
 value_from_register (struct type *type, int regnum, struct frame_info *frame)
 {
   struct gdbarch *gdbarch = get_frame_arch (frame);
-  struct type *type1 = check_typedef (type);
   struct value *v;
 
-  if (gdbarch_convert_register_p (gdbarch, regnum, type1))
+  type = check_typedef (type);
+
+  if (gdbarch_convert_register_p (gdbarch, regnum, type))
     {
       int optim, unavail, ok;
 
@@ -747,7 +742,7 @@ value_from_register (struct type *type, int regnum, struct frame_info *frame)
       VALUE_LVAL (v) = lval_register;
       VALUE_FRAME_ID (v) = get_frame_id (frame);
       VALUE_REGNUM (v) = regnum;
-      ok = gdbarch_register_to_value (gdbarch, frame, regnum, type1,
+      ok = gdbarch_register_to_value (gdbarch, frame, regnum, type,
 				      value_contents_raw (v), &optim,
 				      &unavail);
 

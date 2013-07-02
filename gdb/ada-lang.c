@@ -12286,6 +12286,7 @@ ada_operator_length (const struct expression *exp, int pc, int *oplenp,
 
 static int
 ada_operator_check (struct expression *exp, int pos,
+		    int (*type_func) (struct type *type, void *data),
 		    int (*objfile_func) (struct objfile *objfile, void *data),
 		    void *data)
 {
@@ -12300,12 +12301,15 @@ ada_operator_check (struct expression *exp, int pos,
 	break;
 
       default:
-	return operator_check_standard (exp, pos, objfile_func, data);
+	return operator_check_standard (exp, pos, type_func, objfile_func,
+					data);
     }
 
   /* Invoke callbacks for TYPE and OBJFILE if they were set as non-NULL.  */
 
-  if (type && TYPE_OBJFILE (type)
+  if (type && type_func && (*type_func) (type, data))
+    return 1;
+  if (type && TYPE_OBJFILE (type) && objfile_func
       && (*objfile_func) (TYPE_OBJFILE (type), data))
     return 1;
 

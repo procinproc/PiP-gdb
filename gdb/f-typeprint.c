@@ -30,7 +30,7 @@
 #include "gdbcore.h"
 #include "target.h"
 #include "f-lang.h"
-
+#include "dwarf2loc.h"
 #include "gdb_string.h"
 #include <errno.h>
 
@@ -47,6 +47,34 @@ void f_type_print_varspec_prefix (struct type *, struct ui_file *,
 void f_type_print_base (struct type *, struct ui_file *, int, int);
 
 
+const char *
+f_object_address_data_valid_print_to_stream (struct type *type,
+					     struct ui_file *stream)
+{
+  const char *msg;
+
+  msg = object_address_data_not_valid (type);
+  if (msg != NULL)
+    {
+      /* Assuming the content printed to STREAM should not be localized.  */
+      fprintf_filtered (stream, "<%s>", msg);
+    }
+
+  return msg;
+}
+
+void
+f_object_address_data_valid_or_error (struct type *type)
+{
+  const char *msg;
+
+  msg = object_address_data_not_valid (type);
+  if (msg != NULL)
+    {
+      error (_("Cannot access it because the %s."), _(msg));
+    }
+}
+
 /* LEVEL is the depth to indent lines by.  */
 
 void
@@ -55,6 +83,9 @@ f_print_type (struct type *type, const char *varstring, struct ui_file *stream,
 {
   enum type_code code;
   int demangled_args;
+
+  if (f_object_address_data_valid_print_to_stream (type, stream) != NULL)
+    return;
 
   f_type_print_base (type, stream, show, level);
   code = TYPE_CODE (type);
@@ -161,6 +192,9 @@ f_type_print_varspec_suffix (struct type *type, struct ui_file *stream,
     return;
 
   QUIT;
+
+  if (TYPE_CODE (type) != TYPE_CODE_TYPEDEF)
+    CHECK_TYPEDEF (type);
 
   switch (TYPE_CODE (type))
     {

@@ -1765,6 +1765,7 @@ parser_fprintf (FILE *x, const char *y, ...)
 
 int
 operator_check_standard (struct expression *exp, int pos,
+			 int (*type_func) (struct type *type, void *data),
 			 int (*objfile_func) (struct objfile *objfile,
 					      void *data),
 			 void *data)
@@ -1804,7 +1805,7 @@ operator_check_standard (struct expression *exp, int pos,
 	    struct type *type = elts[pos + 2 + arg].type;
 	    struct objfile *objfile = TYPE_OBJFILE (type);
 
-	    if (objfile && (*objfile_func) (objfile, data))
+	    if (objfile && objfile_func && (*objfile_func) (objfile, data))
 	      return 1;
 	  }
       }
@@ -1822,7 +1823,8 @@ operator_check_standard (struct expression *exp, int pos,
 
 	/* Check objfile where the variable itself is placed.
 	   SYMBOL_OBJ_SECTION (symbol) may be NULL.  */
-	if ((*objfile_func) (SYMBOL_SYMTAB (symbol)->objfile, data))
+	if (objfile_func
+	    && (*objfile_func) (SYMBOL_SYMTAB (symbol)->objfile, data))
 	  return 1;
 
 	/* Check objfile where is placed the code touching the variable.  */
@@ -1835,24 +1837,27 @@ operator_check_standard (struct expression *exp, int pos,
 
   /* Invoke callbacks for TYPE and OBJFILE if they were set as non-NULL.  */
 
-  if (type && TYPE_OBJFILE (type)
+  if (type && type_func && (*type_func) (type, data))
+    return 1;
+  if (type && TYPE_OBJFILE (type) && objfile_func
       && (*objfile_func) (TYPE_OBJFILE (type), data))
     return 1;
-  if (objfile && (*objfile_func) (objfile, data))
+  if (objfile && objfile_func && (*objfile_func) (objfile, data))
     return 1;
 
   return 0;
 }
 
-/* Call OBJFILE_FUNC for any TYPE and OBJFILE found being referenced by EXP.
-   The functions are never called with NULL OBJFILE.  Functions get passed an
-   arbitrary caller supplied DATA pointer.  If any of the functions returns
-   non-zero value then (any other) non-zero value is immediately returned to
-   the caller.  Otherwise zero is returned after iterating through whole EXP.
-   */
+/* Call TYPE_FUNC and OBJFILE_FUNC for any TYPE and OBJFILE found being
+   referenced by EXP.  The functions are never called with NULL TYPE or NULL
+   OBJFILE.  Functions get passed an arbitrary caller supplied DATA pointer.
+   If any of the functions returns non-zero value then (any other) non-zero
+   value is immediately returned to the caller.  Otherwise zero is returned
+   after iterating through whole EXP.  */
 
 static int
 exp_iterate (struct expression *exp,
+	     int (*type_func) (struct type *type, void *data),
 	     int (*objfile_func) (struct objfile *objfile, void *data),
 	     void *data)
 {
@@ -1867,7 +1872,9 @@ exp_iterate (struct expression *exp,
 
       pos = endpos - oplen;
       if (exp->language_defn->la_exp_desc->operator_check (exp, pos,
-							   objfile_func, data))
+							   type_func,
+							   objfile_func,
+							   data))
 	return 1;
 
       endpos = pos;
@@ -1898,8 +1905,29 @@ exp_uses_objfile (struct expression *exp, struct objfile *objfile)
 {
   gdb_assert (objfile->separate_debug_objfile_backlink == NULL);
 
-  return exp_iterate (exp, exp_uses_objfile_iter, objfile);
+  return exp_iterate (exp, NULL, exp_uses_objfile_iter, objfile);
 }
+
+/* Helper for exp_types_mark_used.  */
+
+#if 0
+static int
+exp_types_mark_used_iter (struct type *type, void *unused)
+{
+  type_mark_used (type);
+
+  /* Continue the traversal.  */
+  return 0;
+}
+
+/* Call type_mark_used for any type contained in EXP.  */
+
+void
+exp_types_mark_used (struct expression *exp)
+{
+  exp_iterate (exp, exp_types_mark_used_iter, NULL, NULL);
+}
+#endif
 
 void
 _initialize_parse (void)

@@ -692,3 +692,21 @@ block_iter_match_next (const char *name,
 
   return block_iter_match_step (iterator, name, compare, 0);
 }
+
+/* Return OBJFILE in which BLOCK is located or NULL if we cannot find it for
+   whatever reason.  */
+
+struct objfile *
+block_objfile (const struct block *block)
+{
+  struct symbol *func;
+
+  if (block == NULL)
+    return NULL;
+
+  func = block_linkage_function (block);
+  if (func == NULL)
+    return NULL;
+
+  return SYMBOL_SYMTAB (func)->objfile;
+}

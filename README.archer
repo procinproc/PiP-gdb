@@ -1,0 +1,13 @@
+Merge for Fedora 19: http://pkgs.fedoraproject.org/cgit/gdb.git/
+
+jankratochvil/vla
+tromey/python
+
+================================================================
+This branch originally held the Python code for gdb.  It still exists
+because a small amount of code here has not yet been merged upstream.
+
+================================================================
+C variable length arrays / DW_FORM_block / Fortran dynamic arrays.
+implementation plan:             http://sourceware.org/ml/gdb/2012-11/msg00094.html
+explanation of its merge status: http://sourceware.org/ml/gdb/2011-03/msg00021.html

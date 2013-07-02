@@ -378,4 +378,6 @@ extern int myread (int, char *, int);
 extern ULONGEST align_up (ULONGEST v, int n);
 extern ULONGEST align_down (ULONGEST v, int n);
 
+extern struct cleanup *make_cleanup_restore_selected_frame (void);
+
 #endif /* UTILS_H */

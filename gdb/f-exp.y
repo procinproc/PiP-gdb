@@ -297,7 +297,9 @@ arglist :	subrange
 			{ arglist_len = 1; }
 	;
    
-arglist	:	arglist ',' exp   %prec ABOVE_COMMA
+arglist	:	arglist ',' exp       %prec ABOVE_COMMA
+			{ arglist_len++; }
+	|	arglist ',' subrange  %prec ABOVE_COMMA
 			{ arglist_len++; }
 	;
 

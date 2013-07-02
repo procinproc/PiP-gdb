@@ -45,6 +45,7 @@
 #include "objfiles.h"
 #include "symtab.h"
 #include "exceptions.h"
+#include "dwarf2loc.h"
 
 extern unsigned int overload_debug;
 /* Local functions.  */
@@ -903,6 +904,65 @@ value_one (struct type *type)
   return val;
 }
 
+/* object_address_set must be already called before this function.  */
+
+const char *
+object_address_data_not_valid (struct type *type)
+{
+  /* Attributes are present only at the target type of a typedef.  Make the
+     call conditional as it would otherwise loop through type_length_get.  */
+  if (TYPE_CODE (type) == TYPE_CODE_TYPEDEF)
+    CHECK_TYPEDEF (type);
+
+  /* DW_AT_associated has a preference over DW_AT_allocated.  */
+  if (TYPE_NOT_ASSOCIATED (type)
+      || (TYPE_ASSOCIATED (type) != NULL
+	  && 0 == dwarf_locexpr_baton_eval (TYPE_ASSOCIATED (type))))
+    return N_("object is not associated");
+
+  if (TYPE_NOT_ALLOCATED (type)
+      || (TYPE_ALLOCATED (type) != NULL
+	  && 0 == dwarf_locexpr_baton_eval (TYPE_ALLOCATED (type))))
+    return N_("object is not allocated");
+
+  return NULL;
+}
+
+/* Return non-NULL check_typedef result on TYPE if the variable is valid.  If
+   it is valid the function may store the data address (DW_AT_DATA_LOCATION) of
+   TYPE at *ADDRESS_RETURN.  You must set *ADDRESS_RETURN from
+   value_raw_address (VAL) before calling this function.  If no
+   DW_AT_DATA_LOCATION is present for TYPE the address at *ADDRESS_RETURN is
+   left unchanged.  ADDRESS_RETURN must not be NULL, use
+   object_address_data_not_valid () for just the data validity check.  */
+
+struct type *
+object_address_get_data (struct type *type, CORE_ADDR *address_return)
+{
+  gdb_assert (address_return != NULL);
+
+  object_address_set (*address_return);
+
+  /* TYPE_DATA_LOCATION_DWARF_BLOCK / TYPE_DATA_LOCATION_ADDR are present only
+     at the target type of a typedef.  */
+  CHECK_TYPEDEF (type);
+
+  if (object_address_data_not_valid (type) != NULL)
+    {
+      /* Do not try to evaluate DW_AT_data_location as it may even crash
+	 (it would just return the value zero in the gfortran case).  */
+      return NULL;
+    }
+
+  if (TYPE_DATA_LOCATION_IS_ADDR (type))
+    *address_return = TYPE_DATA_LOCATION_ADDR (type);
+  else if (TYPE_DATA_LOCATION_DWARF_BLOCK (type) != NULL)
+    *address_return
+      = dwarf_locexpr_baton_eval (TYPE_DATA_LOCATION_DWARF_BLOCK (type));
+
+  return type;
+}
+
 /* Helper function for value_at, value_at_lazy, and value_at_lazy_stack.  */
 
 static struct value *
@@ -965,7 +1025,8 @@ int
 value_fetch_lazy (struct value *val)
 {
   gdb_assert (value_lazy (val));
-  allocate_value_contents (val);
+  if (VALUE_LVAL (val) != lval_memory)
+    allocate_value_contents (val);
   if (value_bitsize (val))
     {
       /* To read a lazy bitfield, read the entire enclosing value.  This
@@ -998,13 +1059,24 @@ value_fetch_lazy (struct value *val)
     }
   else if (VALUE_LVAL (val) == lval_memory)
     {
-      CORE_ADDR addr = value_address (val);
-      struct type *type = check_typedef (value_enclosing_type (val));
+      CORE_ADDR addr = value_raw_address (val);
 
-      if (TYPE_LENGTH (type))
-	read_value_memory (val, 0, value_stack (val),
-			   addr, value_contents_all_raw (val),
-			   TYPE_LENGTH (type));
+      if (object_address_get_data (value_type (val), &addr))
+	{
+	  struct type *type = value_enclosing_type (val);
+	  int length = TYPE_LENGTH (check_typedef (type));
+
+	  if (length)
+	    {
+	      /* Delay it after object_address_get_data above.  */
+	      allocate_value_contents (val);
+	      addr += value_offset (val);
+	      read_value_memory (val, 0, value_stack (val),
+				 addr, value_contents_all_raw (val), length);
+	    }
+	}
+      /* Just to be sure it has been called.  */
+      allocate_value_contents (val);
     }
   else if (VALUE_LVAL (val) == lval_register)
     {
@@ -1529,7 +1601,18 @@ address_of_variable (struct symbol *var, const struct block *b)
   if ((VALUE_LVAL (val) == lval_memory && value_lazy (val))
       || TYPE_CODE (type) == TYPE_CODE_FUNC)
     {
-      CORE_ADDR addr = value_address (val);
+      CORE_ADDR addr;
+
+      if (VALUE_LVAL (val) == lval_memory)
+	{
+	  addr = value_raw_address (val);
+	  if (!object_address_get_data (type, &addr))
+	    error (_("Can't take address of memory lvalue \"%s\"."),
+		   SYMBOL_PRINT_NAME (var));
+	  set_value_address (val, addr);
+	}
+
+      addr = value_address (val);
 
       return value_from_pointer (lookup_pointer_type (type), addr);
     }
@@ -1636,6 +1719,7 @@ struct value *
 value_coerce_array (struct value *arg1)
 {
   struct type *type = check_typedef (value_type (arg1));
+  CORE_ADDR address;
 
   /* If the user tries to do something requiring a pointer with an
      array that has not yet been pushed to the target, then this would
@@ -1645,8 +1729,12 @@ value_coerce_array (struct value *arg1)
   if (VALUE_LVAL (arg1) != lval_memory)
     error (_("Attempt to take address of value not located in memory."));
 
+  address = value_raw_address (arg1);
+  if (!object_address_get_data (type, &address))
+    error (_("Attempt to take address of non-valid value."));
+
   return value_from_pointer (lookup_pointer_type (TYPE_TARGET_TYPE (type)),
-			     value_address (arg1));
+			     address + value_offset (arg1));
 }
 
 /* Given a value which is a function, return a value which is a pointer
@@ -3721,6 +3809,8 @@ value_slice (struct value *array, int lowbound, int length)
 					TYPE_TARGET_TYPE (range_type),
 					lowbound, 
 					lowbound + length - 1);
+  TYPE_BYTE_STRIDE (slice_range_type) = TYPE_BYTE_STRIDE (range_type);
+
 
     {
       struct type *element_type = TYPE_TARGET_TYPE (array_type);

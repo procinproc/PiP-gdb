@@ -34,6 +34,8 @@ void eval_python_from_control_command (struct command_line *);
 
 void source_python_script (FILE *file, const char *filename);
 
+void run_python_script (int argc, char **argv);
+
 int apply_val_pretty_printer (struct type *type, const gdb_byte *valaddr,
 			      int embedded_offset, CORE_ADDR address,
 			      struct ui_file *stream, int recurse,

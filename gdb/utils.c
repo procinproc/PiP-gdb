@@ -1813,6 +1813,36 @@ set_batch_flag_and_make_cleanup_restore_page_info (void)
   return back_to;
 }
 
+/* Helper for make_cleanup_restore_page_info.  */
+
+static void
+do_restore_selected_frame_cleanup (void *arg)
+{
+  struct frame_id *frame_idp = arg;
+
+  select_frame (frame_find_by_id (*frame_idp));
+
+  xfree (frame_idp);
+}
+
+/* Provide cleanup for restoring currently selected frame.  Use frame_id for
+   the case the current frame becomes stale in the meantime.  */
+
+struct cleanup *
+make_cleanup_restore_selected_frame (void)
+{
+  struct frame_id *frame_idp;
+
+  /* get_selected_frame->get_current_frame would error otherwise.  */
+  if (!has_stack_frames ())
+    return make_cleanup (null_cleanup, NULL);
+
+  frame_idp = xmalloc (sizeof (*frame_idp));
+  *frame_idp = get_frame_id (get_selected_frame (NULL));
+
+  return make_cleanup (do_restore_selected_frame_cleanup, frame_idp);
+}
+
 /* Set the screen size based on LINES_PER_PAGE and CHARS_PER_LINE.  */
 
 static void

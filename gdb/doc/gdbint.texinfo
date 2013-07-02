@@ -2101,6 +2101,18 @@ time, and so we attempt to handle symbols incrementally.  For instance,
 we create @dfn{partial symbol tables} consisting of only selected
 symbols, and only expand them to full symbol tables when necessary.
 
+@menu
+* Symbol Reading::
+* Partial Symbol Tables::
+* Types::
+* Object File Formats::
+* Debugging File Formats::
+* Adding a New Symbol Reader to GDB::
+* Memory Management for Symbol Files::
+* Memory Management for Types::
+@end menu
+
+@node Symbol Reading
 @section Symbol Reading
 
 @cindex symbol reading
@@ -2193,6 +2205,7 @@ symtab.  Upon return, @code{pst->readin} should have been set to 1, and
 zero if there were no symbols in that part of the symbol file.
 @end table
 
+@node Partial Symbol Tables
 @section Partial Symbol Tables
 
 @value{GDBN} has three types of symbol tables:
@@ -2294,6 +2307,7 @@ and partial symbol tables behind a set of function pointers known as
 the @dfn{quick symbol functions}.  These are documented in
 @file{symfile.h}.
 
+@node Types
 @section Types
 
 @unnumberedsubsec Fundamental Types (e.g., @code{FT_VOID}, @code{FT_BOOLEAN}).
@@ -2316,6 +2330,7 @@ types map to one @code{TYPE_CODE_*} type, and are distinguished by
 other members of the type struct, such as whether the type is signed
 or unsigned, and how many bits it uses.
 
+@anchor{Builtin Types}
 @unnumberedsubsec Builtin Types (e.g., @code{builtin_type_void}, @code{builtin_type_char}).
 
 These are instances of type structs that roughly correspond to
@@ -2330,6 +2345,7 @@ only one instance exists, while @file{c-lang.c} builds as many
 @code{TYPE_CODE_INT} types as needed, with each one associated with
 some particular objfile.
 
+@node Object File Formats
 @section Object File Formats
 @cindex object file formats
 
@@ -2415,6 +2431,7 @@ SOM, which is a cross-language ABI).
 
 The SOM reader is in @file{somread.c}.
 
+@node Debugging File Formats
 @section Debugging File Formats
 
 This section describes characteristics of debugging information that
@@ -2486,6 +2503,7 @@ DWARF 3 is an improved version of DWARF 2.
 @cindex SOM debugging info
 Like COFF, the SOM definition includes debugging information.
 
+@node Adding a New Symbol Reader to GDB
 @section Adding a New Symbol Reader to @value{GDBN}
 
 @cindex adding debugging info reader
@@ -2508,6 +2526,7 @@ will only ever be implemented by one object file format may be called
 directly.  This interface should be described in a file
 @file{bfd/lib@var{xyz}.h}, which is included by @value{GDBN}.
 
+@node Memory Management for Symbol Files
 @section Memory Management for Symbol Files
 
 Most memory associated with a loaded symbol file is stored on
@@ -2519,10 +2538,45 @@ released when the objfile is unloaded or reloaded.  Therefore one
 objfile must not reference symbol or type data from another objfile;
 they could be unloaded at different times.
 
-User convenience variables, et cetera, have associated types.  Normally
-these types live in the associated objfile.  However, when the objfile
-is unloaded, those types are deep copied to global memory, so that
-the values of the user variables and history items are not lost.
+@node Memory Management for Types
+@section Memory Management for Types
+@cindex memory management for types
+
+@findex TYPE_OBJFILE
+@code{TYPE_OBJFILE} macro indicates the current memory owner of the type.
+Non-@code{NULL} value indicates it is owned by an objfile (specifically by its
+obstack) and in such case the type remains valid till the objfile is unloaded
+or reloaded.  For such types with an associated objfile no reference counting
+is being made.
+
+User convenience variables, et cetera, have associated types.  Normally these
+types live in the associated objfile.  However, when the objfile is unloaded,
+those types are deep copied to global memory, so that the values of the user
+variables and history items are not lost.  During the copy they will get their
+@code{TYPE_OBJFILE} set to @code{NULL} and become so-called @dfn{reclaimable}
+types.
+
+Types with null @code{TYPE_OBJFILE} can be either permanent types
+(@pxref{Builtin Types}) or reclaimable types which will be deallocated at the
+first idle @value{GDBN} moment if the last object referencing them is removed.
+Permanent types are allocated by the function @code{alloc_type} (and its
+derivations like @code{init_type}) specifying objfile as @code{NULL}.  The
+reclaimable types are created the same way but moreover they need to have
+@code{type_init_group} called to start their tracking as being possibly
+deallocatable.
+
+@findex free_all_types
+When @value{GDBN} gets idle it always calls the @code{free_all_types} function
+which deallocates any unused types.  All types currently not owned by an
+objfile must be marked as used on each @code{free_all_types} call as they would
+get deallocated as unused otherwise.
+
+@code{free_all_types} automatically checks for any cross-type references such
+as through @code{TYPE_TARGET_TYPE}, @code{TYPE_POINTER_TYPE} etc.@: and
+prevents early deallocation for any such existing references.  Reclaimable
+types may reference any other reclaimable types or even permanent types.  But
+permanent types must not reference reclaimable types (nor an objfile associated
+type).
 
 
 @node Language Support

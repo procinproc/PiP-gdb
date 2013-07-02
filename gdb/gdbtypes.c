@@ -37,6 +37,9 @@
 #include "gdb_assert.h"
 #include "hashtab.h"
 #include "exceptions.h"
+#include "observer.h"
+#include "dwarf2expr.h"
+#include "dwarf2loc.h"
 
 /* Initialize BADNESS constants.  */
 
@@ -185,6 +188,43 @@ alloc_type (struct objfile *objfile)
   return type;
 }
 
+#if 0
+/* Declare TYPE as discardable on next garbage collection by free_all_types.
+   You must call type_mark_used during each free_all_types to protect TYPE from
+   being deallocated.  */
+
+static void
+set_type_as_discardable (struct type *type)
+{
+  void **slot;
+
+  gdb_assert (!TYPE_DISCARDABLE (type));
+
+  TYPE_DISCARDABLE (type) = 1;
+  TYPE_DISCARDABLE_AGE (type) = type_discardable_age_current;
+
+  slot = htab_find_slot (type_discardable_table, type, INSERT);
+  gdb_assert (!*slot);
+  *slot = type;
+}
+#endif
+
+/* Allocate a new type like alloc_type but preserve for it the discardability
+   state of PARENT_TYPE.  */
+
+static struct type *
+alloc_type_as_parent (struct type *parent_type)
+{
+  struct type *new_type = alloc_type_copy (parent_type);
+
+#if 0
+  if (TYPE_DISCARDABLE (parent_type))
+    set_type_as_discardable (new_type);
+#endif
+
+  return new_type;
+}
+
 /* Allocate a new GDBARCH-associated type structure and fill it
    with some defaults.  Space for the type structure is allocated
    on the heap.  */
@@ -310,7 +350,7 @@ make_pointer_type (struct type *type, struct type **typeptr)
 
   if (typeptr == 0 || *typeptr == 0)	/* We'll need to allocate one.  */
     {
-      ntype = alloc_type_copy (type);
+      ntype = alloc_type_as_parent (type);
       if (typeptr)
 	*typeptr = ntype;
     }
@@ -383,7 +423,7 @@ make_reference_type (struct type *type, struct type **typeptr)
 
   if (typeptr == 0 || *typeptr == 0)	/* We'll need to allocate one.  */
     {
-      ntype = alloc_type_copy (type);
+      ntype = alloc_type_as_parent (type);
       if (typeptr)
 	*typeptr = ntype;
     }
@@ -806,6 +846,7 @@ create_range_type (struct type *result_type, struct type *index_type,
     TYPE_ZALLOC (result_type, sizeof (struct range_bounds));
   TYPE_LOW_BOUND (result_type) = low_bound;
   TYPE_HIGH_BOUND (result_type) = high_bound;
+  TYPE_BYTE_STRIDE (result_type) = 0;
 
   if (low_bound >= 0)
     TYPE_UNSIGNED (result_type) = 1;
@@ -926,6 +967,10 @@ get_array_bounds (struct type *type, LONGEST *low_bound, LONGEST *high_bound)
   return 1;
 }
 
+static LONGEST type_length_get (struct type *type, struct type *target_type,
+				int full_span);
+
+
 /* Create an array type using either a blank type supplied in
    RESULT_TYPE, or creating a new type, inheriting the objfile from
    RANGE_TYPE.
@@ -949,26 +994,31 @@ create_array_type (struct type *result_type,
 
   TYPE_CODE (result_type) = TYPE_CODE_ARRAY;
   TYPE_TARGET_TYPE (result_type) = element_type;
-  if (get_discrete_bounds (range_type, &low_bound, &high_bound) < 0)
-    low_bound = high_bound = 0;
-  CHECK_TYPEDEF (element_type);
-  /* Be careful when setting the array length.  Ada arrays can be
-     empty arrays with the high_bound being smaller than the low_bound.
-     In such cases, the array length should be zero.  */
-  if (high_bound < low_bound)
-    TYPE_LENGTH (result_type) = 0;
-  else
-    TYPE_LENGTH (result_type) =
-      TYPE_LENGTH (element_type) * (high_bound - low_bound + 1);
   TYPE_NFIELDS (result_type) = 1;
   TYPE_FIELDS (result_type) =
     (struct field *) TYPE_ZALLOC (result_type, sizeof (struct field));
   TYPE_INDEX_TYPE (result_type) = range_type;
   TYPE_VPTR_FIELDNO (result_type) = -1;
 
-  /* TYPE_FLAG_TARGET_STUB will take care of zero length arrays.  */
+  /* DWARF blocks may depend on runtime information like
+     DW_OP_PUSH_OBJECT_ADDRESS not being available during the
+     CREATE_ARRAY_TYPE time.  */
+  if (TYPE_RANGE_DATA (range_type)->low.kind != RANGE_BOUND_KIND_CONSTANT
+      || TYPE_RANGE_DATA (range_type)->high.kind != RANGE_BOUND_KIND_CONSTANT
+      || TYPE_DYNAMIC (element_type))
+    TYPE_LENGTH (result_type) = 0;
+  else
+    {
+      CHECK_TYPEDEF (element_type);
+      TYPE_LENGTH (result_type) = type_length_get (result_type, element_type,
+						   0);
+    }
   if (TYPE_LENGTH (result_type) == 0)
-    TYPE_TARGET_STUB (result_type) = 1;
+    {
+      /* The real size will be computed for specific instances by
+	 CHECK_TYPEDEF.  */
+      TYPE_TARGET_STUB (result_type) = 1;
+    }
 
   return result_type;
 }
@@ -1489,6 +1539,105 @@ stub_noname_complaint (void)
   complaint (&symfile_complaints, _("stub type has NULL name"));
 }
 
+/* Calculate the memory length of array TYPE.
+
+   TARGET_TYPE should be set to `check_typedef (TYPE_TARGET_TYPE (type))' as
+   a performance hint.  Feel free to pass NULL.  Set FULL_SPAN to return the
+   size incl. the possible padding of the last element - it may differ from the
+   cleared FULL_SPAN return value (the expected SIZEOF) for non-zero
+   TYPE_BYTE_STRIDE values.  */
+
+static LONGEST
+type_length_get (struct type *type, struct type *target_type, int full_span)
+{
+  struct type *range_type;
+  LONGEST byte_stride = 0;	/* `= 0' for a false GCC warning.  */
+  LONGEST count, element_size, retval;
+
+  if (TYPE_CODE (type) != TYPE_CODE_ARRAY
+      && TYPE_CODE (type) != TYPE_CODE_STRING)
+    return TYPE_LENGTH (type);
+
+  /* Avoid executing TYPE_HIGH_BOUND for invalid (unallocated/unassociated)
+     Fortran arrays.  The allocated data will never be used so they can be
+     zero-length.  */
+  if (object_address_data_not_valid (type))
+    return 0;
+
+  range_type = TYPE_INDEX_TYPE (type);
+  if (TYPE_LOW_BOUND_UNDEFINED (range_type)
+      || TYPE_HIGH_BOUND_UNDEFINED (range_type))
+    return 0;
+  count = TYPE_HIGH_BOUND (range_type) - TYPE_LOW_BOUND (range_type) + 1;
+  /* It may happen for wrong DWARF annotations returning garbage data.  */
+  if (count < 0)
+    warning (_("Range for type %s has invalid bounds %s..%s"),
+	     TYPE_ERROR_NAME (type), plongest (TYPE_LOW_BOUND (range_type)),
+	     plongest (TYPE_HIGH_BOUND (range_type)));
+  /* The code below does not handle count == 0 right.  */
+  if (count <= 0)
+    return 0;
+  if (full_span || count > 1)
+    {
+      /* We do not use TYPE_ARRAY_BYTE_STRIDE_VALUE (type) here as we want to
+         force FULL_SPAN to 1.  */
+      byte_stride = TYPE_BYTE_STRIDE (range_type);
+      if (byte_stride == 0)
+        {
+	  if (target_type == NULL)
+	    target_type = check_typedef (TYPE_TARGET_TYPE (type));
+	  byte_stride = type_length_get (target_type, NULL, 1);
+	}
+    }
+
+  /* For now, we conservatively take the array length to be 0 if its length
+     exceeds UINT_MAX.  The code below assumes that for x < 0,
+     (ULONGEST) x == -x + ULONGEST_MAX + 1, which is technically not guaranteed
+     by C, but is usually true (because it would be true if x were unsigned
+     with its high-order bit on). It uses the fact that high_bound-low_bound is
+     always representable in ULONGEST and that if high_bound-low_bound+1
+     overflows, it overflows to 0.  We must change these tests if we decide to
+     increase the representation of TYPE_LENGTH from unsigned int to ULONGEST.
+     */
+
+  if (full_span)
+    {
+      retval = count * byte_stride;
+      if (count == 0 || retval / count != byte_stride || retval > UINT_MAX)
+	retval = 0;
+      return retval;
+    }
+  if (target_type == NULL)
+    target_type = check_typedef (TYPE_TARGET_TYPE (type));
+  element_size = type_length_get (target_type, NULL, 1);
+  retval = (count - 1) * byte_stride + element_size;
+  if (retval < element_size
+      || (byte_stride != 0
+          && (retval - element_size) / byte_stride != count - 1)
+      || retval > UINT_MAX)
+    retval = 0;
+  return retval;
+}
+
+/* Prepare TYPE after being read in by the backend.  Currently this function
+   only propagates the TYPE_DYNAMIC flag.  */
+
+void
+finalize_type (struct type *type)
+{
+  int i;
+
+  for (i = 0; i < TYPE_NFIELDS (type); ++i)
+    if (TYPE_FIELD_TYPE (type, i) && TYPE_DYNAMIC (TYPE_FIELD_TYPE (type, i)))
+      break;
+
+  /* FIXME: cplus_stuff is ignored here.  */
+  if (i < TYPE_NFIELDS (type)
+      || (TYPE_VPTR_BASETYPE (type) && TYPE_DYNAMIC (TYPE_VPTR_BASETYPE (type)))
+      || (TYPE_TARGET_TYPE (type) && TYPE_DYNAMIC (TYPE_TARGET_TYPE (type))))
+    TYPE_DYNAMIC (type) = 1;
+}
+
 /* Find the real type of TYPE.  This function returns the real type,
    after removing all layers of typedefs, and completing opaque or stub
    types.  Completion changes the TYPE argument, but stripping of
@@ -1655,52 +1804,37 @@ check_typedef (struct type *type)
         }
     }
 
-  if (TYPE_TARGET_STUB (type))
+  /* copy_type_recursive automatically makes the resulting type containing only
+     constant values expected by the callers of this function.  */
+  if (TYPE_DYNAMIC (type))
     {
-      struct type *range_type;
+      htab_t copied_types;
+
+      copied_types = create_copied_types_hash (NULL);
+      type = copy_type_recursive (type, copied_types);
+      htab_delete (copied_types);
+
+      gdb_assert (TYPE_DYNAMIC (type) == 0);
+      /* Force TYPE_LENGTH (type) recalculation.  */
+      TYPE_DYNAMIC (type) = 1;
+    }
+
+  if (TYPE_TARGET_STUB (type) || TYPE_DYNAMIC (type))
+    {
       struct type *target_type = check_typedef (TYPE_TARGET_TYPE (type));
 
+      if (TYPE_DYNAMIC (type))
+	TYPE_TARGET_TYPE (type) = target_type;
       if (TYPE_STUB (target_type) || TYPE_TARGET_STUB (target_type))
 	{
 	  /* Nothing we can do.  */
 	}
       else if (TYPE_CODE (type) == TYPE_CODE_ARRAY
-	       && TYPE_NFIELDS (type) == 1
-	       && (TYPE_CODE (range_type = TYPE_INDEX_TYPE (type))
-		   == TYPE_CODE_RANGE))
+	       || TYPE_CODE (type) == TYPE_CODE_STRING)
 	{
 	  /* Now recompute the length of the array type, based on its
-	     number of elements and the target type's length.
-	     Watch out for Ada null Ada arrays where the high bound
-	     is smaller than the low bound.  */
-	  const LONGEST low_bound = TYPE_LOW_BOUND (range_type);
-	  const LONGEST high_bound = TYPE_HIGH_BOUND (range_type);
-	  ULONGEST len;
-
-	  if (high_bound < low_bound)
-	    len = 0;
-	  else
-	    {
-	      /* For now, we conservatively take the array length to be 0
-		 if its length exceeds UINT_MAX.  The code below assumes
-		 that for x < 0, (ULONGEST) x == -x + ULONGEST_MAX + 1,
-		 which is technically not guaranteed by C, but is usually true
-		 (because it would be true if x were unsigned with its
-		 high-order bit on).  It uses the fact that
-		 high_bound-low_bound is always representable in
-		 ULONGEST and that if high_bound-low_bound+1 overflows,
-		 it overflows to 0.  We must change these tests if we 
-		 decide to increase the representation of TYPE_LENGTH
-		 from unsigned int to ULONGEST.  */
-	      ULONGEST ulow = low_bound, uhigh = high_bound;
-	      ULONGEST tlen = TYPE_LENGTH (target_type);
-
-	      len = tlen * (uhigh - ulow + 1);
-	      if (tlen == 0 || (len / tlen - 1 + ulow) != uhigh 
-		  || len > UINT_MAX)
-		len = 0;
-	    }
-	  TYPE_LENGTH (type) = len;
+	     number of elements and the target type's length.  */
+	  TYPE_LENGTH (type) = type_length_get (type, target_type, 0);
 	  TYPE_TARGET_STUB (type) = 0;
 	}
       else if (TYPE_CODE (type) == TYPE_CODE_RANGE)
@@ -1708,6 +1842,7 @@ check_typedef (struct type *type)
 	  TYPE_LENGTH (type) = TYPE_LENGTH (target_type);
 	  TYPE_TARGET_STUB (type) = 0;
 	}
+      TYPE_DYNAMIC (type) = 0;
     }
 
   type = make_qualified_type (type, instance_flags, NULL);
@@ -3384,33 +3519,42 @@ type_pair_eq (const void *item_lhs, const void *item_rhs)
 }
 
 /* Allocate the hash table used by copy_type_recursive to walk
-   types without duplicates.  We use OBJFILE's obstack, because
-   OBJFILE is about to be deleted.  */
+   types without duplicates.   */
 
 htab_t
 create_copied_types_hash (struct objfile *objfile)
 {
-  return htab_create_alloc_ex (1, type_pair_hash, type_pair_eq,
-			       NULL, &objfile->objfile_obstack,
-			       hashtab_obstack_allocate,
-			       dummy_obstack_deallocate);
+  if (objfile == NULL)
+    {
+      /* NULL OBJFILE is for TYPE_DYNAMIC types already contained in
+	 OBJFILE_MALLOC memory, such as those from VALUE_HISTORY_CHAIN.  Table
+	 element entries get allocated by xmalloc - so use xfree.  */
+      return htab_create (1, type_pair_hash, type_pair_eq, xfree);
+    }
+  else
+    {
+      /* Use OBJFILE's obstack, because OBJFILE is about to be deleted.  Table
+	 element entries get allocated by xmalloc - so use xfree.  */
+      return htab_create_alloc_ex (1, type_pair_hash, type_pair_eq,
+				   xfree, &objfile->objfile_obstack,
+				   hashtab_obstack_allocate,
+				   dummy_obstack_deallocate);
+    }
 }
 
-/* Recursively copy (deep copy) TYPE, if it is associated with
-   OBJFILE.  Return a new type allocated using malloc, a saved type if
-   we have already visited TYPE (using COPIED_TYPES), or TYPE if it is
-   not associated with OBJFILE.  */
+/* A helper for copy_type_recursive.  This does all the work.  OBJFILE is used
+   only for an assertion checking.  */
 
-struct type *
-copy_type_recursive (struct objfile *objfile, 
-		     struct type *type,
-		     htab_t copied_types)
+static struct type *
+copy_type_recursive_1 (struct objfile *objfile, 
+		       struct type *type,
+		       htab_t copied_types)
 {
   struct type_pair *stored, pair;
   void **slot;
   struct type *new_type;
 
-  if (! TYPE_OBJFILE_OWNED (type))
+  if (! TYPE_OBJFILE_OWNED (type) && !TYPE_DYNAMIC (type))
     return type;
 
   /* This type shouldn't be pointing to any types in other objfiles;
@@ -3425,9 +3569,10 @@ copy_type_recursive (struct objfile *objfile,
   new_type = alloc_type_arch (get_type_arch (type));
 
   /* We must add the new type to the hash table immediately, in case
-     we encounter this type again during a recursive call below.  */
-  stored
-    = obstack_alloc (&objfile->objfile_obstack, sizeof (struct type_pair));
+     we encounter this type again during a recursive call below.  Memory could
+     be allocated from OBJFILE in the case we will be removing OBJFILE, this
+     optimization is missed and xfree is called for it from COPIED_TYPES.  */
+  stored = xmalloc (sizeof (*stored));
   stored->old = type;
   stored->new = new_type;
   *slot = stored;
@@ -3438,6 +3583,21 @@ copy_type_recursive (struct objfile *objfile,
   TYPE_OBJFILE_OWNED (new_type) = 0;
   TYPE_OWNER (new_type).gdbarch = get_type_arch (type);
 
+#if 0
+  /* TYPE_MAIN_TYPE memory copy above rewrote the TYPE_DISCARDABLE flag so we
+     need to initialize it again.  And even if TYPE was already discardable
+     NEW_TYPE so far is not registered in TYPE_DISCARDABLE_TABLE.  */
+  TYPE_DISCARDABLE (new_type) = 0;
+  set_type_as_discardable (new_type);
+#endif
+
+  /* Pre-clear the fields processed by delete_main_type.  If DWARF block
+     evaluations below call error we would leave an unfreeable TYPE.  */
+  TYPE_TARGET_TYPE (new_type) = NULL;
+  TYPE_VPTR_BASETYPE (new_type) = NULL;
+  TYPE_NFIELDS (new_type) = 0;
+  TYPE_FIELDS (new_type) = NULL;
+
   if (TYPE_NAME (type))
     TYPE_NAME (new_type) = xstrdup (TYPE_NAME (type));
   if (TYPE_TAG_NAME (type))
@@ -3446,12 +3606,48 @@ copy_type_recursive (struct objfile *objfile,
   TYPE_INSTANCE_FLAGS (new_type) = TYPE_INSTANCE_FLAGS (type);
   TYPE_LENGTH (new_type) = TYPE_LENGTH (type);
 
+  if (TYPE_ALLOCATED (new_type))
+    {
+      gdb_assert (!TYPE_NOT_ALLOCATED (new_type));
+
+      if (!dwarf_locexpr_baton_eval (TYPE_ALLOCATED (new_type)))
+        TYPE_NOT_ALLOCATED (new_type) = 1;
+      TYPE_ALLOCATED (new_type) = NULL;
+    }
+
+  if (TYPE_ASSOCIATED (new_type))
+    {
+      gdb_assert (!TYPE_NOT_ASSOCIATED (new_type));
+
+      if (!dwarf_locexpr_baton_eval (TYPE_ASSOCIATED (new_type)))
+        TYPE_NOT_ASSOCIATED (new_type) = 1;
+      TYPE_ASSOCIATED (new_type) = NULL;
+    }
+
+  if (!TYPE_DATA_LOCATION_IS_ADDR (new_type)
+      && TYPE_DATA_LOCATION_DWARF_BLOCK (new_type))
+    {
+      if (TYPE_NOT_ALLOCATED (new_type)
+          || TYPE_NOT_ASSOCIATED (new_type))
+	TYPE_DATA_LOCATION_DWARF_BLOCK (new_type) = NULL;
+      else
+	{
+	  TYPE_DATA_LOCATION_IS_ADDR (new_type) = 1;
+	  TYPE_DATA_LOCATION_ADDR (new_type) = dwarf_locexpr_baton_eval
+				    (TYPE_DATA_LOCATION_DWARF_BLOCK (new_type));
+	}
+    }
+
   /* Copy the fields.  */
   if (TYPE_NFIELDS (type))
     {
       int i, nfields;
 
+      /* TYPE_CODE_RANGE uses TYPE_RANGE_DATA of the union with TYPE_FIELDS.  */
+      gdb_assert (TYPE_CODE (type) != TYPE_CODE_RANGE);
+
       nfields = TYPE_NFIELDS (type);
+      TYPE_NFIELDS (new_type) = nfields;
       TYPE_FIELDS (new_type) = XCALLOC (nfields, struct field);
       for (i = 0; i < nfields; i++)
 	{
@@ -3460,8 +3656,8 @@ copy_type_recursive (struct objfile *objfile,
 	  TYPE_FIELD_BITSIZE (new_type, i) = TYPE_FIELD_BITSIZE (type, i);
 	  if (TYPE_FIELD_TYPE (type, i))
 	    TYPE_FIELD_TYPE (new_type, i)
-	      = copy_type_recursive (objfile, TYPE_FIELD_TYPE (type, i),
-				     copied_types);
+	      = copy_type_recursive_1 (objfile, TYPE_FIELD_TYPE (type, i),
+				       copied_types);
 	  if (TYPE_FIELD_NAME (type, i))
 	    TYPE_FIELD_NAME (new_type, i) = 
 	      xstrdup (TYPE_FIELD_NAME (type, i));
@@ -3492,24 +3688,184 @@ copy_type_recursive (struct objfile *objfile,
 	}
     }
 
+  /* Both FIELD_LOC_KIND_DWARF_BLOCK and TYPE_RANGE_HIGH_BOUND_IS_COUNT were
+     possibly converted.  */
+  TYPE_DYNAMIC (new_type) = 0;
+
   /* For range types, copy the bounds information.  */
-  if (TYPE_CODE (type) == TYPE_CODE_RANGE)
+  if (TYPE_CODE (new_type) == TYPE_CODE_RANGE)
     {
       TYPE_RANGE_DATA (new_type) = xmalloc (sizeof (struct range_bounds));
       *TYPE_RANGE_DATA (new_type) = *TYPE_RANGE_DATA (type);
+
+      switch (TYPE_RANGE_DATA (new_type)->low.kind)
+	{
+	case RANGE_BOUND_KIND_CONSTANT:
+	  break;
+	case RANGE_BOUND_KIND_DWARF_BLOCK:
+	  /* `struct dwarf2_locexpr_baton' is too bound to its objfile so
+	     it is expected to be made constant by CHECK_TYPEDEF.
+	     TYPE_NOT_ALLOCATED and TYPE_NOT_ASSOCIATED are not valid for TYPE.
+	     */
+	  if (TYPE_NOT_ALLOCATED (new_type) || TYPE_NOT_ASSOCIATED (new_type)
+	      || ! has_stack_frames ())
+	    {
+	      /* We should set 1 for Fortran but how to find the language?  */
+	      TYPE_LOW_BOUND (new_type) = 0;
+	      TYPE_LOW_BOUND_UNDEFINED (new_type) = 1;
+	    }
+	  else
+	    {
+	      TYPE_LOW_BOUND (new_type) = dwarf_locexpr_baton_eval
+				(TYPE_RANGE_DATA (new_type)->low.u.dwarf_block);
+	      if (TYPE_LOW_BOUND (new_type) >= 0)
+		TYPE_UNSIGNED (new_type) = 1;
+	    }
+	  TYPE_RANGE_DATA (new_type)->low.kind = RANGE_BOUND_KIND_CONSTANT;
+	  break;
+	case RANGE_BOUND_KIND_DWARF_LOCLIST:
+	  {
+	    CORE_ADDR addr;
+
+	    /* `struct dwarf2_loclist_baton' is too bound to its objfile so
+	       it is expected to be made constant by CHECK_TYPEDEF.
+	       TYPE_NOT_ALLOCATED and TYPE_NOT_ASSOCIATED are not valid for TYPE.
+	       */
+	    if (! TYPE_NOT_ALLOCATED (new_type)
+	        && ! TYPE_NOT_ASSOCIATED (new_type) && has_stack_frames ()
+	        && dwarf_loclist_baton_eval
+		  (TYPE_RANGE_DATA (new_type)->low.u.dwarf_loclist.loclist,
+		   TYPE_RANGE_DATA (new_type)->low.u.dwarf_loclist.type, &addr))
+	      {
+		TYPE_LOW_BOUND (new_type) = addr;
+		if (TYPE_LOW_BOUND (new_type) >= 0)
+		  TYPE_UNSIGNED (new_type) = 1;
+	      }
+	    else
+	      {
+		/* We should set 1 for Fortran but how to find the language?  */
+		TYPE_LOW_BOUND (new_type) = 0;
+		TYPE_LOW_BOUND_UNDEFINED (new_type) = 1;
+	      }
+	    TYPE_RANGE_DATA (new_type)->low.kind = RANGE_BOUND_KIND_CONSTANT;
+	  }
+	  break;
+	}
+
+      switch (TYPE_RANGE_DATA (new_type)->high.kind)
+	{
+	case RANGE_BOUND_KIND_CONSTANT:
+	  break;
+	case RANGE_BOUND_KIND_DWARF_BLOCK:
+	  /* `struct dwarf2_locexpr_baton' is too bound to its objfile so
+	     it is expected to be made constant by CHECK_TYPEDEF.
+	     TYPE_NOT_ALLOCATED and TYPE_NOT_ASSOCIATED are not valid for TYPE.
+	     */
+	  if (TYPE_NOT_ALLOCATED (new_type) || TYPE_NOT_ASSOCIATED (new_type)
+	      || ! has_stack_frames ())
+	    {
+	      TYPE_HIGH_BOUND (new_type) = TYPE_LOW_BOUND (new_type) - 1;
+	      TYPE_HIGH_BOUND_UNDEFINED (new_type) = 1;
+	    }
+	  else
+	    TYPE_HIGH_BOUND (new_type) = dwarf_locexpr_baton_eval
+			       (TYPE_RANGE_DATA (new_type)->high.u.dwarf_block);
+	  TYPE_RANGE_DATA (new_type)->high.kind = RANGE_BOUND_KIND_CONSTANT;
+	  break;
+	case RANGE_BOUND_KIND_DWARF_LOCLIST:
+	  {
+	    CORE_ADDR addr;
+
+	    /* `struct dwarf2_loclist_baton' is too bound to its objfile so
+	       it is expected to be made constant by CHECK_TYPEDEF.
+	       TYPE_NOT_ALLOCATED and TYPE_NOT_ASSOCIATED are not valid for TYPE.
+	       */
+	    if (! TYPE_NOT_ALLOCATED (new_type)
+	        && ! TYPE_NOT_ASSOCIATED (new_type) && has_stack_frames ()
+	        && dwarf_loclist_baton_eval
+		      (TYPE_RANGE_DATA (new_type)->high.u.dwarf_loclist.loclist,
+		       TYPE_RANGE_DATA (new_type)->high.u.dwarf_loclist.type,
+		       &addr))
+	      TYPE_HIGH_BOUND (new_type) = addr;
+	    else
+	      {
+		TYPE_HIGH_BOUND (new_type) = TYPE_LOW_BOUND (new_type) - 1;
+		TYPE_HIGH_BOUND_UNDEFINED (new_type) = 1;
+	      }
+	    TYPE_RANGE_DATA (new_type)->high.kind = RANGE_BOUND_KIND_CONSTANT;
+	  }
+	  break;
+	}
+
+      switch (TYPE_RANGE_DATA (new_type)->byte_stride.kind)
+	{
+	case RANGE_BOUND_KIND_CONSTANT:
+	  break;
+	case RANGE_BOUND_KIND_DWARF_BLOCK:
+	  /* `struct dwarf2_locexpr_baton' is too bound to its objfile so
+	     it is expected to be made constant by CHECK_TYPEDEF.
+	     TYPE_NOT_ALLOCATED and TYPE_NOT_ASSOCIATED are not valid for TYPE.
+	     */
+	  if (TYPE_NOT_ALLOCATED (new_type) || TYPE_NOT_ASSOCIATED (new_type)
+	      || ! has_stack_frames ())
+	    TYPE_BYTE_STRIDE (new_type) = 0;
+	  else
+	    TYPE_BYTE_STRIDE (new_type) = dwarf_locexpr_baton_eval
+			(TYPE_RANGE_DATA (new_type)->byte_stride.u.dwarf_block);
+	  TYPE_RANGE_DATA (new_type)->byte_stride.kind
+	    = RANGE_BOUND_KIND_CONSTANT;
+	  break;
+	case RANGE_BOUND_KIND_DWARF_LOCLIST:
+	  {
+	    CORE_ADDR addr = 0;
+
+	    /* `struct dwarf2_loclist_baton' is too bound to its objfile so
+	       it is expected to be made constant by CHECK_TYPEDEF.
+	       TYPE_NOT_ALLOCATED and TYPE_NOT_ASSOCIATED are not valid for TYPE.
+	       */
+	    if (! TYPE_NOT_ALLOCATED (new_type)
+		&& ! TYPE_NOT_ASSOCIATED (new_type) && has_stack_frames ())
+	      dwarf_loclist_baton_eval
+	       (TYPE_RANGE_DATA (new_type)->byte_stride.u.dwarf_loclist.loclist,
+		TYPE_RANGE_DATA (new_type)->byte_stride.u.dwarf_loclist.type,
+		&addr);
+	    TYPE_BYTE_STRIDE (new_type) = addr;
+	    TYPE_RANGE_DATA (new_type)->byte_stride.kind
+	      = RANGE_BOUND_KIND_CONSTANT;
+	  }
+	  break;
+	}
+
+      /* Convert TYPE_RANGE_HIGH_BOUND_IS_COUNT into a regular bound.  */
+      if (TYPE_RANGE_HIGH_BOUND_IS_COUNT (new_type))
+	{
+	  TYPE_HIGH_BOUND (new_type) = TYPE_LOW_BOUND (new_type)
+				       + TYPE_HIGH_BOUND (new_type) - 1;
+	  TYPE_RANGE_HIGH_BOUND_IS_COUNT (new_type) = 0;
+	}
     }
 
   /* Copy pointers to other types.  */
   if (TYPE_TARGET_TYPE (type))
     TYPE_TARGET_TYPE (new_type) = 
-      copy_type_recursive (objfile, 
-			   TYPE_TARGET_TYPE (type),
-			   copied_types);
+      copy_type_recursive_1 (objfile, 
+			     TYPE_TARGET_TYPE (type),
+			     copied_types);
   if (TYPE_VPTR_BASETYPE (type))
     TYPE_VPTR_BASETYPE (new_type) = 
-      copy_type_recursive (objfile,
-			   TYPE_VPTR_BASETYPE (type),
-			   copied_types);
+      copy_type_recursive_1 (objfile,
+			     TYPE_VPTR_BASETYPE (type),
+			     copied_types);
+
+  if (TYPE_CODE (new_type) == TYPE_CODE_ARRAY)
+    {
+      struct type *new_index_type = TYPE_INDEX_TYPE (new_type);
+
+      if (TYPE_BYTE_STRIDE (new_index_type) == 0)
+	TYPE_BYTE_STRIDE (new_index_type)
+	  = TYPE_LENGTH (TYPE_TARGET_TYPE (new_type));
+    }
+
   /* Maybe copy the type_specific bits.
 
      NOTE drow/2005-12-09: We do not copy the C++-specific bits like
@@ -3524,6 +3880,17 @@ copy_type_recursive (struct objfile *objfile,
     INIT_CPLUS_SPECIFIC (new_type);
 
   return new_type;
+}
+
+/* Recursively copy (deep copy) TYPE.  Return a new type allocated using
+   malloc, a saved type if we have already visited TYPE (using COPIED_TYPES),
+   or TYPE if it is not associated with OBJFILE.  */
+
+struct type *
+copy_type_recursive (struct type *type,
+		     htab_t copied_types)
+{
+  return copy_type_recursive_1 (TYPE_OBJFILE (type), type, copied_types);
 }
 
 /* Make a copy of the given TYPE, except that the pointer & reference
@@ -4090,6 +4457,13 @@ void
 _initialize_gdbtypes (void)
 {
   gdbtypes_data = gdbarch_data_register_post_init (gdbtypes_post_init);
+
+#if 0
+  type_discardable_table = htab_create_alloc (20, type_discardable_hash,
+					     type_discardable_equal, NULL,
+					     xcalloc, xfree);
+#endif
+
   objfile_type_data = register_objfile_data ();
 
   add_setshow_zuinteger_cmd ("overload", no_class, &overload_debug,

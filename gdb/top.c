@@ -350,6 +350,9 @@ prepare_execute_command (void)
 
   mark = value_mark ();
   cleanup = make_cleanup_value_free_to_mark (mark);
+#if 0
+  free_all_types ();
+#endif
 
   /* With multiple threads running while the one we're examining is
      stopped, the dcache can get stale without us being able to detect

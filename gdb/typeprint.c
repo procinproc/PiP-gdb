@@ -34,6 +34,7 @@
 #include "gdb_string.h"
 #include "exceptions.h"
 #include "valprint.h"
+#include "dwarf2loc.h"
 #include <errno.h>
 #include <ctype.h>
 #include "cli/cli-utils.h"
@@ -363,6 +364,9 @@ void
 type_print (struct type *type, const char *varstring, struct ui_file *stream,
 	    int show)
 {
+  if (show >= 0 && current_language->la_language != language_ada)
+    type = check_typedef (type);
+
   LA_PRINT_TYPE (type, varstring, stream, show, 0, &default_ptype_flags);
 }
 
@@ -410,6 +414,7 @@ whatis_exp (char *exp, int show)
   struct value_print_options opts;
   struct type_print_options flags = default_ptype_flags;
 
+  /* Required at least for the object_address_set call.  */
   old_chain = make_cleanup (null_cleanup, NULL);
 
   if (exp)
@@ -457,6 +462,7 @@ whatis_exp (char *exp, int show)
   else
     val = access_value_history (0);
 
+  object_address_set (value_raw_address (val));
   type = value_type (val);
 
   get_user_print_options (&opts);

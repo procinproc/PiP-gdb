@@ -195,7 +195,10 @@ value_subscripted_rvalue (struct value *array, LONGEST index, int lowerbound)
   struct type *array_type = check_typedef (value_type (array));
   struct type *elt_type = check_typedef (TYPE_TARGET_TYPE (array_type));
   unsigned int elt_size = TYPE_LENGTH (elt_type);
-  unsigned int elt_offs = elt_size * longest_to_int (index - lowerbound);
+  unsigned int elt_stride
+    = (TYPE_BYTE_STRIDE (TYPE_INDEX_TYPE (array_type)) == 0
+       ? elt_size : TYPE_BYTE_STRIDE (TYPE_INDEX_TYPE (array_type)));
+  unsigned int elt_offs = elt_stride * longest_to_int (index - lowerbound);
   struct value *v;
 
   if (index < lowerbound || (!TYPE_ARRAY_UPPER_BOUND_IS_UNDEFINED (array_type)
@@ -255,6 +258,10 @@ int
 binop_user_defined_p (enum exp_opcode op,
 		      struct value *arg1, struct value *arg2)
 {
+  /* FIXME: We should support user defined ops for dynamic types.  */
+  if (TYPE_DYNAMIC (value_type (arg1)) || TYPE_DYNAMIC (value_type (arg2)))
+    return 0;
+
   return binop_types_user_defined_p (op, value_type (arg1), value_type (arg2));
 }
 

@@ -38,6 +38,7 @@
 #include "cp-abi.h"
 #include "cp-support.h"
 #include "exceptions.h"
+#include "dwarf2loc.h"
 
 
 /* Decorations for Pascal.  */
@@ -73,8 +74,31 @@ pascal_val_print (struct type *type, const gdb_byte *valaddr,
   struct type *char_type;
   CORE_ADDR addr;
   int want_space = 0;
+  struct cleanup *back_to;
+  struct type *saved_type = type;
+  CORE_ADDR saved_address = address;
+  
+  back_to = make_cleanup (null_cleanup, 0);
+  address += embedded_offset;
+  type = object_address_get_data (type, &address);
+  if (type == NULL)
+    {
+      fputs_filtered (object_address_data_not_valid (saved_type), stream);
+      gdb_flush (stream);
+      do_cleanups (back_to);
+      return;
+    }
+  if (address != saved_address + embedded_offset)
+    {
+      size_t length = TYPE_LENGTH (type);
 
-  CHECK_TYPEDEF (type);
+      valaddr = xmalloc (length);
+      make_cleanup (xfree, (gdb_byte *) valaddr);
+      read_memory (address, (gdb_byte *) valaddr, length);
+      embedded_offset = 0;
+    }
+  else
+    address -= embedded_offset;
   switch (TYPE_CODE (type))
     {
     case TYPE_CODE_ARRAY:
@@ -130,8 +154,8 @@ pascal_val_print (struct type *type, const gdb_byte *valaddr,
 		{
 		  i = 0;
 		}
-	      val_print_array_elements (type, valaddr, embedded_offset,
-					address, stream, recurse,
+	      val_print_array_elements (saved_type, valaddr, embedded_offset,
+					saved_address, stream, recurse,
 					original_value, options, i);
 	      fprintf_filtered (stream, "}");
 	    }
@@ -169,6 +193,7 @@ pascal_val_print (struct type *type, const gdb_byte *valaddr,
 	{
 	  /* Try to print what function it points to.  */
 	  print_address_demangle (options, gdbarch, addr, stream, demangle);
+	  do_cleanups (back_to);
 	  return;
 	}
 
@@ -270,6 +295,7 @@ pascal_val_print (struct type *type, const gdb_byte *valaddr,
 	    }
 	}
 
+      do_cleanups (back_to);
       return;
 
     case TYPE_CODE_REF:
@@ -410,6 +436,7 @@ pascal_val_print (struct type *type, const gdb_byte *valaddr,
 	     TYPE_CODE (type));
     }
   gdb_flush (stream);
+  do_cleanups (back_to);
 }
 
 void

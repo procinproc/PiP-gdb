@@ -51,6 +51,7 @@
 #include "cli/cli-utils.h"
 #include "format.h"
 #include "source.h"
+#include "dwarf2loc.h"
 
 #ifdef TUI
 #include "tui/tui.h"		/* For tui_active et al.   */
@@ -967,6 +968,11 @@ print_command_1 (char *exp, int voidprint)
   else
     val = access_value_history (0);
 
+  /* Do not try to OBJECT_ADDRESS_SET here anything.  We are interested in the
+     source variable base addresses as found by READ_VAR_VALUE.  The value here
+     can be already a calculated expression address inappropriate for
+     DW_OP_push_object_address.  */
+
   if (voidprint || (val && value_type (val) &&
 		    TYPE_CODE (value_type (val)) != TYPE_CODE_VOID))
     {
@@ -1038,6 +1044,9 @@ output_command (char *exp, int from_tty)
   old_chain = make_cleanup (free_current_contents, &expr);
 
   val = evaluate_expression (expr);
+
+  if (VALUE_LVAL (val) == lval_memory)
+    object_address_set (value_raw_address (val));
 
   annotate_value_begin (value_type (val));
 
@@ -1467,6 +1476,24 @@ x_command (char *exp, int from_tty)
 	set_internalvar (lookup_internalvar ("__"), last_examine_value);
     }
 }
+
+#if 0
+/* Call type_mark_used for any TYPEs referenced from this GDB source file.  */
+
+static void
+print_types_mark_used (void)
+{
+  struct display *d;
+
+  if (last_examine_value)
+    type_mark_used (value_type (last_examine_value));
+
+  for (d = display_chain; d; d = d->next)
+    if (d->exp)
+      exp_types_mark_used (d->exp);
+}
+#endif
+
 
 
 /* Add an expression to the auto-display chain.
@@ -1964,6 +1991,10 @@ print_variable_and_value (const char *name, struct symbol *var,
       struct value_print_options opts;
 
       val = read_var_value (var, frame);
+
+      make_cleanup_restore_selected_frame ();
+      select_frame (frame);
+
       get_user_print_options (&opts);
       opts.deref_ref = 1;
       common_val_print (val, stream, indent, &opts, current_language);
@@ -2613,4 +2644,8 @@ Show printing of source filename and line number with <symbol>."), NULL,
   add_com ("eval", no_class, eval_command, _("\
 Convert \"printf format string\", arg1, arg2, arg3, ..., argn to\n\
 a command line, and call it."));
+
+#if 0
+  observer_attach_mark_used (print_types_mark_used);
+#endif
 }

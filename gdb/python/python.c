@@ -67,6 +67,8 @@ static const char *gdbpy_should_print_stack = python_excp_message;
 #include "linespec.h"
 #include "source.h"
 #include "version.h"
+#include "inferior.h"
+#include "gdbthread.h"
 #include "target.h"
 #include "gdbthread.h"
 #include "observer.h"
@@ -1095,6 +1097,53 @@ gdbpy_print_stack (void)
 
 /* Return the current Progspace.
    There always is one.  */
+/* True if 'gdb -P' was used, false otherwise.  */
+static int running_python_script;
+
+/* True if we are currently in a call to 'gdb.cli', false otherwise.  */
+static int in_cli;
+
+/* Enter the command loop.  */
+
+static PyObject *
+gdbpy_cli (PyObject *unused1, PyObject *unused2)
+{
+  if (! running_python_script || in_cli)
+    return PyErr_Format (PyExc_RuntimeError, "cannot invoke CLI recursively");
+
+  in_cli = 1;
+  cli_command_loop ();
+  in_cli = 0;
+
+  Py_RETURN_NONE;
+}
+
+/* Set up the Python argument vector and evaluate a script.  This is
+   used to implement 'gdb -P'.  */
+
+void
+run_python_script (int argc, char **argv)
+{
+  FILE *input;
+
+  /* We never free this, since we plan to exit at the end.  */
+  ensure_python_env (get_current_arch (), current_language);
+
+  running_python_script = 1;
+  PySys_SetArgv (argc - 1, argv + 1);
+  input = fopen (argv[0], "r");
+  if (! input)
+    {
+      fprintf (stderr, "could not open %s: %s\n", argv[0], strerror (errno));
+      exit (1);
+    }
+  PyRun_SimpleFile (input, argv[0]);
+  fclose (input);
+  exit (0);
+}
+
+
+
 
 static PyObject *
 gdbpy_get_current_progspace (PyObject *unused1, PyObject *unused2)
@@ -1749,6 +1798,8 @@ static PyMethodDef GdbMethods[] =
     "Get a value from history" },
   { "execute", (PyCFunction) execute_gdb_command, METH_VARARGS | METH_KEYWORDS,
     "Execute a gdb command" },
+  { "cli", gdbpy_cli, METH_NOARGS,
+    "Enter the gdb CLI" },
   { "parameter", gdbpy_parameter, METH_VARARGS,
     "Return a gdb parameter's value" },
 

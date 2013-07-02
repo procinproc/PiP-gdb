@@ -51,15 +51,17 @@ int f77_array_offset_tbl[MAX_FORTRAN_DIMS + 1][2];
 /* The following macro gives us the size of the nth dimension, Where 
    n is 1 based.  */
 
-#define F77_DIM_SIZE(n) (f77_array_offset_tbl[n][1])
+#define F77_DIM_COUNT(n) (f77_array_offset_tbl[n][1])
 
-/* The following gives us the offset for row n where n is 1-based.  */
+/* The following gives us the element size for row n where n is 1-based.  */
 
-#define F77_DIM_OFFSET(n) (f77_array_offset_tbl[n][0])
+#define F77_DIM_BYTE_STRIDE(n) (f77_array_offset_tbl[n][0])
 
 int
 f77_get_lowerbound (struct type *type)
 {
+  f_object_address_data_valid_or_error (type);
+
   if (TYPE_ARRAY_LOWER_BOUND_IS_UNDEFINED (type))
     error (_("Lower bound may not be '*' in F77"));
 
@@ -69,14 +71,17 @@ f77_get_lowerbound (struct type *type)
 int
 f77_get_upperbound (struct type *type)
 {
+  f_object_address_data_valid_or_error (type);
+
   if (TYPE_ARRAY_UPPER_BOUND_IS_UNDEFINED (type))
     {
-      /* We have an assumed size array on our hands.  Assume that
-	 upper_bound == lower_bound so that we show at least 1 element.
-	 If the user wants to see more elements, let him manually ask for 'em
-	 and we'll subscript the array and show him.  */
+      /* We have an assumed size array on our hands.  As type_length_get
+	 already assumes a length zero of arrays with underfined bounds VALADDR
+	 passed to the Fortran functions does not contained the real inferior
+	 memory content.  User should request printing of specific array
+	 elements instead.  */
 
-      return f77_get_lowerbound (type);
+      return f77_get_lowerbound (type) - 1;
     }
 
   return TYPE_ARRAY_UPPER_BOUND_VALUE (type);
@@ -132,24 +137,29 @@ f77_create_arrayprint_offset_tbl (struct type *type, struct ui_file *stream)
       upper = f77_get_upperbound (tmp_type);
       lower = f77_get_lowerbound (tmp_type);
 
-      F77_DIM_SIZE (ndimen) = upper - lower + 1;
+      F77_DIM_COUNT (ndimen) = upper - lower + 1;
+
+      F77_DIM_BYTE_STRIDE (ndimen) =
+        TYPE_ARRAY_BYTE_STRIDE_VALUE (tmp_type);
 
       tmp_type = TYPE_TARGET_TYPE (tmp_type);
       ndimen++;
     }
 
-  /* Now we multiply eltlen by all the offsets, so that later we 
+  /* Now we multiply eltlen by all the BYTE_STRIDEs, so that later we
      can print out array elements correctly.  Up till now we 
-     know an offset to apply to get the item but we also 
+     know an eltlen to apply to get the item but we also 
      have to know how much to add to get to the next item.  */
 
   ndimen--;
   eltlen = TYPE_LENGTH (tmp_type);
-  F77_DIM_OFFSET (ndimen) = eltlen;
+  if (F77_DIM_BYTE_STRIDE (ndimen) == 0)
+    F77_DIM_BYTE_STRIDE (ndimen) = eltlen;
   while (--ndimen > 0)
     {
-      eltlen *= F77_DIM_SIZE (ndimen + 1);
-      F77_DIM_OFFSET (ndimen) = eltlen;
+      eltlen *= F77_DIM_COUNT (ndimen + 1);
+      if (F77_DIM_BYTE_STRIDE (ndimen) == 0)
+	F77_DIM_BYTE_STRIDE (ndimen) = eltlen;
     }
 }
 
@@ -171,37 +181,35 @@ f77_print_array_1 (int nss, int ndimensions, struct type *type,
 
   if (nss != ndimensions)
     {
-      for (i = 0;
-	   (i < F77_DIM_SIZE (nss) && (*elts) < options->print_max);
-	   i++)
+      for (i = 0; (i < F77_DIM_COUNT (nss) && (*elts) < options->print_max); i++)
 	{
 	  fprintf_filtered (stream, "( ");
 	  f77_print_array_1 (nss + 1, ndimensions, TYPE_TARGET_TYPE (type),
 			     valaddr,
-			     embedded_offset + i * F77_DIM_OFFSET (nss),
+			     embedded_offset + i * F77_DIM_BYTE_STRIDE (nss),
 			     address,
 			     stream, recurse, val, options, elts);
 	  fprintf_filtered (stream, ") ");
 	}
-      if (*elts >= options->print_max && i < F77_DIM_SIZE (nss)) 
+      if (*elts >= options->print_max && i < F77_DIM_COUNT (nss))
 	fprintf_filtered (stream, "...");
     }
   else
     {
-      for (i = 0; i < F77_DIM_SIZE (nss) && (*elts) < options->print_max;
+      for (i = 0; i < F77_DIM_COUNT (nss) && (*elts) < options->print_max;
 	   i++, (*elts)++)
 	{
 	  val_print (TYPE_TARGET_TYPE (type),
 		     valaddr,
-		     embedded_offset + i * F77_DIM_OFFSET (ndimensions),
+		     embedded_offset + i * F77_DIM_BYTE_STRIDE (ndimensions),
 		     address, stream, recurse,
 		     val, options, current_language);
 
-	  if (i != (F77_DIM_SIZE (nss) - 1))
+	  if (i != (F77_DIM_COUNT (nss) - 1))
 	    fprintf_filtered (stream, ", ");
 
 	  if ((*elts == options->print_max - 1)
-	      && (i != (F77_DIM_SIZE (nss) - 1)))
+	      && (i != (F77_DIM_COUNT (nss) - 1)))
 	    fprintf_filtered (stream, "...");
 	}
     }
@@ -266,6 +274,9 @@ f_val_print (struct type *type, const gdb_byte *valaddr, int embedded_offset,
   struct type *elttype;
   CORE_ADDR addr;
   int index;
+
+  if (f_object_address_data_valid_print_to_stream (type, stream) != NULL)
+    return;
 
   CHECK_TYPEDEF (type);
   switch (TYPE_CODE (type))

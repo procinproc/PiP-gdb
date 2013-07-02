@@ -42,6 +42,7 @@
 #include <ctype.h>
 #include "tracepoint.h"
 #include "cp-abi.h"
+#include "observer.h"
 
 /* Prototypes for exported functions.  */
 
@@ -1433,12 +1434,15 @@ void
 set_value_component_location (struct value *component,
 			      const struct value *whole)
 {
+  CORE_ADDR addr;
+
   if (whole->lval == lval_internalvar)
     VALUE_LVAL (component) = lval_internalvar_component;
   else
     VALUE_LVAL (component) = whole->lval;
 
   component->location = whole->location;
+
   if (whole->lval == lval_computed)
     {
       const struct lval_funcs *funcs = whole->location.computed.funcs;
@@ -1446,6 +1450,12 @@ set_value_component_location (struct value *component,
       if (funcs->copy_closure)
         component->location.computed.closure = funcs->copy_closure (whole);
     }
+
+  addr = value_raw_address (component);
+  object_address_get_data (value_type (whole), &addr);
+  if (component->lval != lval_internalvar
+      && component->lval != lval_internalvar_component)
+    set_value_address (component, addr);
 }
 
 
@@ -1578,6 +1588,31 @@ show_values (char *num_exp, int from_tty)
       num_exp[0] = '+';
       num_exp[1] = '\0';
     }
+}
+
+/* Sanity check for memory leaks and proper types reference counting.  */
+
+static void
+value_history_cleanup (void *unused)
+{
+  while (value_history_chain)
+    {
+      struct value_history_chunk *chunk = value_history_chain;
+      int i;
+
+      for (i = 0; i < ARRAY_SIZE (chunk->values); i++)
+      	value_free (chunk->values[i]);
+
+      value_history_chain = chunk->next;
+      xfree (chunk);
+    }
+  value_history_count = 0;
+
+  /* Free the unreferenced types above.  */
+  free_all_values ();
+#if 0
+  free_all_types ();
+#endif
 }
 
 /* Internal variables.  These are variables within the debugger
@@ -2114,6 +2149,38 @@ call_internal_function (struct gdbarch *gdbarch,
   return (*ifn->handler) (gdbarch, language, ifn->cookie, argc, argv);
 }
 
+#if 0
+/* Call type_mark_used for any TYPEs referenced from this GDB source file.  */
+
+static void
+value_types_mark_used (void)
+{
+  struct internalvar *var;
+  struct value_history_chunk *chunk;
+
+  for (var = internalvars; var != NULL; var = var->next)
+    switch (var->kind)
+      {
+      case INTERNALVAR_VALUE:
+	type_mark_used (value_type (var->u.value));
+	break;
+
+      case INTERNALVAR_INTEGER:
+	type_mark_used (var->u.integer.type);
+	break;
+      }
+
+  for (chunk = value_history_chain; chunk != NULL; chunk = chunk->next)
+    {
+      int i;
+
+      for (i = 0; i < ARRAY_SIZE (chunk->values); i++)
+	if (chunk->values[i])
+	  type_mark_used (value_type (chunk->values[i]));
+    }
+}
+#endif
+
 /* The 'function' command.  This does nothing -- it is just a
    placeholder to let "help function NAME" work.  This is also used as
    the implementation of the sub-command that is created when
@@ -2161,11 +2228,10 @@ preserve_one_value (struct value *value, struct objfile *objfile,
 		    htab_t copied_types)
 {
   if (TYPE_OBJFILE (value->type) == objfile)
-    value->type = copy_type_recursive (objfile, value->type, copied_types);
+    value->type = copy_type_recursive (value->type, copied_types);
 
   if (TYPE_OBJFILE (value->enclosing_type) == objfile)
-    value->enclosing_type = copy_type_recursive (objfile,
-						 value->enclosing_type,
+    value->enclosing_type = copy_type_recursive (value->enclosing_type,
 						 copied_types);
 }
 
@@ -2180,7 +2246,7 @@ preserve_one_internalvar (struct internalvar *var, struct objfile *objfile,
     case INTERNALVAR_INTEGER:
       if (var->u.integer.type && TYPE_OBJFILE (var->u.integer.type) == objfile)
 	var->u.integer.type
-	  = copy_type_recursive (objfile, var->u.integer.type, copied_types);
+	  = copy_type_recursive (var->u.integer.type, copied_types);
       break;
 
     case INTERNALVAR_VALUE:
@@ -3278,9 +3344,26 @@ readjust_indirect_value_type (struct value *value, struct type *enc_type,
 struct value *
 coerce_ref (struct value *arg)
 {
-  struct type *value_type_arg_tmp = check_typedef (value_type (arg));
+  struct type *value_type_arg_tmp;
   struct value *retval;
   struct type *enc_type;
+
+  if (TYPE_DYNAMIC (value_type (arg)))
+    {
+      struct cleanup *cleanups = make_cleanup (null_cleanup, NULL);
+      CORE_ADDR address;
+
+      value_type_arg_tmp = value_type (arg);
+      address = value_raw_address (arg);
+      value_type_arg_tmp = object_address_get_data (value_type_arg_tmp,
+						    &address);
+      if (! value_type_arg_tmp)
+	error (_("Attempt to coerce non-valid value."));
+      arg = value_at_lazy (value_type_arg_tmp, address);
+      do_cleanups (cleanups);
+    }
+  else
+    value_type_arg_tmp = check_typedef (value_type (arg));
 
   retval = coerce_ref_if_computed (arg);
   if (retval)
@@ -3403,4 +3486,10 @@ VARIABLE is already initialized."));
   add_prefix_cmd ("function", no_class, function_command, _("\
 Placeholder command for showing help on convenience functions."),
 		  &functionlist, "function ", 0, &cmdlist);
+
+  make_final_cleanup (value_history_cleanup, NULL);
+
+#if 0
+  observer_attach_mark_used (value_types_mark_used);
+#endif
 }
