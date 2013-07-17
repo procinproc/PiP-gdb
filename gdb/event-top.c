@@ -36,6 +36,7 @@
 #include "continuations.h"
 #include "gdbcmd.h"		/* for dont_repeat() */
 #include "annotate.h"
+#include "symfile.h"
 
 /* readline include files.  */
 #include "readline/readline.h"
@@ -170,6 +171,8 @@ rl_callback_read_char_wrapper (gdb_client_data client_data)
 void
 cli_command_loop (void)
 {
+  debug_flush_missing ();
+
   display_gdb_prompt (0);
 
   /* Now it's time to start the event loop.  */
@@ -236,6 +239,8 @@ display_gdb_prompt (char *new_prompt)
 
   /* Reset the nesting depth used when trace-commands is set.  */
   reset_command_nest_depth ();
+
+  debug_flush_missing ();
 
   /* Each interpreter has its own rules on displaying the command
      prompt.  */

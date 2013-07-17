@@ -598,6 +598,8 @@ extern struct elf_build_id *build_id_addr_get (CORE_ADDR addr);
 extern char *build_id_to_filename (const struct elf_build_id *build_id,
 				   char **link_return, int add_debug_suffix);
 extern void debug_print_missing (const char *binary, const char *debug);
+extern void debug_flush_missing (void);
+#define BUILD_ID_MAIN_EXECUTABLE_FILENAME _("the main executable file")
 
 /* From dwarf2read.c */
 

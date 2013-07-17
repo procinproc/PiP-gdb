@@ -30,6 +30,7 @@
 #include "tui/tui.h"
 #include "tui/tui-io.h"
 #include "exceptions.h"
+#include "symfile.h"
 
 /* Set to 1 when the TUI mode must be activated when we first start
    gdb.  */
