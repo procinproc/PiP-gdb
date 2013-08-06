@@ -432,6 +432,10 @@ struct objfile
 
 #define OBJF_MAINLINE (1 << 5)
 
+/* This file was loaded according to the BUILD_ID_CORE_LOADS rules.  */
+
+#define OBJF_BUILD_ID_CORE_LOADED (1 << 12)
+
 /* The object file that contains the runtime common minimal symbols
    for SunOS4.  Note that this objfile has no associated BFD.  */
 

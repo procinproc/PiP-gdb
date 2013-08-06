@@ -1224,9 +1224,52 @@ svr4_read_so_list (CORE_ADDR lm, struct so_list ***link_ptr_ptr,
 	  continue;
 	}
 
-      strncpy (new->so_name, buffer, SO_NAME_MAX_PATH_SIZE - 1);
-      new->so_name[SO_NAME_MAX_PATH_SIZE - 1] = '\0';
-      strcpy (new->so_original_name, new->so_name);
+      {
+	struct elf_build_id *build_id;
+
+	strncpy (new->so_original_name, buffer, SO_NAME_MAX_PATH_SIZE - 1);
+	new->so_original_name[SO_NAME_MAX_PATH_SIZE - 1] = '\0';
+	/* May get overwritten below.  */
+	strcpy (new->so_name, new->so_original_name);
+
+	build_id = build_id_addr_get (new->lm_info->l_ld);
+	if (build_id != NULL)
+	  {
+	    char *name, *build_id_filename;
+
+	    /* Missing the build-id matching separate debug info file
+	       would be handled while SO_NAME gets loaded.  */
+	    name = build_id_to_filename (build_id, &build_id_filename, 0);
+	    if (name != NULL)
+	      {
+		strncpy (new->so_name, name, SO_NAME_MAX_PATH_SIZE - 1);
+		new->so_name[SO_NAME_MAX_PATH_SIZE - 1] = '\0';
+		xfree (name);
+	      }
+	    else
+	      {
+		debug_print_missing (new->so_name, build_id_filename);
+
+		/* In the case the main executable was found according to
+		   its build-id (from a core file) prevent loading
+		   a different build of a library with accidentally the
+		   same SO_NAME.
+
+		   It suppresses bogus backtraces (and prints "??" there
+		   instead) if the on-disk files no longer match the
+		   running program version.  */
+
+		if (symfile_objfile != NULL
+		    && (symfile_objfile->flags
+			& OBJF_BUILD_ID_CORE_LOADED) != 0)
+		  new->so_name[0] = 0;
+	      }
+
+	    xfree (build_id_filename);
+	    xfree (build_id);
+	  }
+      }
+
       xfree (buffer);
 
       /* If this entry has no name, or its name matches the name

@@ -593,6 +593,12 @@ void free_symfile_segment_data (struct symfile_segment_data *data);
 
 extern struct cleanup *increment_reading_symtab (void);
 
+/* build-id support.  */
+extern struct elf_build_id *build_id_addr_get (CORE_ADDR addr);
+extern char *build_id_to_filename (const struct elf_build_id *build_id,
+				   char **link_return, int add_debug_suffix);
+extern void debug_print_missing (const char *binary, const char *debug);
+
 /* From dwarf2read.c */
 
 /* Names for a dwarf2 debugging section.  The field NORMAL is the normal
