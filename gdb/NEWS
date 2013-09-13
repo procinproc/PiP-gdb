@@ -14,6 +14,10 @@ add-auto-load-scripts-directory directory
 
   ** Frame filters and frame decorators have been added.
 
+* On S/390 targets that provide the transactional-execution feature,
+  the program interruption transaction diagnostic block (TDB) is now
+  represented as a number of additional "registers" in GDB.
+
 * New remote packets
 
 qXfer:libraries-svr4:read's annex
