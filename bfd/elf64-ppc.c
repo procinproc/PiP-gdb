@@ -118,6 +118,7 @@ static bfd_vma opd_entry_value
 #define elf_backend_link_output_symbol_hook   ppc64_elf_output_symbol_hook
 #define elf_backend_special_sections	      ppc64_elf_special_sections
 #define elf_backend_post_process_headers      _bfd_elf_set_osabi
+#define elf_backend_merge_symbol_attribute    ppc64_elf_merge_symbol_attribute
 
 /* The name of the dynamic interpreter.  This is put in the .interp
    section.  */
@@ -3640,6 +3641,9 @@ struct ppc_stub_hash_entry {
   /* Where this stub is being called from, or, in the case of combined
      stub sections, the first input section in the group.  */
   asection *id_sec;
+
+  /* Symbol st_other.  */
+  unsigned char other;
 };
 
 struct ppc_branch_hash_entry {
@@ -3886,7 +3890,9 @@ stub_hash_newfunc (struct bfd_hash_entry *entry,
       eh->target_value = 0;
       eh->target_section = NULL;
       eh->h = NULL;
+      eh->plt_ent = NULL;
       eh->id_sec = NULL;
+      eh->other = 0;
     }
 
   return entry;
@@ -4629,7 +4635,7 @@ static bfd_boolean
 ppc64_elf_add_symbol_hook (bfd *ibfd,
 			   struct bfd_link_info *info,
 			   Elf_Internal_Sym *isym,
-			   const char **name ATTRIBUTE_UNUSED,
+			   const char **name,
 			   flagword *flags ATTRIBUTE_UNUSED,
 			   asection **sec,
 			   bfd_vma *value ATTRIBUTE_UNUSED)
@@ -4649,7 +4655,33 @@ ppc64_elf_add_symbol_hook (bfd *ibfd,
 	   && strcmp ((*sec)->name, ".opd") == 0)
     isym->st_info = ELF_ST_INFO (ELF_ST_BIND (isym->st_info), STT_FUNC);
 
+  if ((STO_PPC64_LOCAL_MASK & isym->st_other) != 0)
+    {
+      if (abiversion (ibfd) == 0)
+	set_abiversion (ibfd, 2);
+      else if (abiversion (ibfd) == 1)
+	{
+	  info->callbacks->einfo (_("%P: symbol '%s' has invalid st_other"
+				    " for ABI version 1\n"), name);
+	  bfd_set_error (bfd_error_bad_value);
+	  return FALSE;
+	}
+    }
+
   return TRUE;
+}
+
+/* Merge non-visibility st_other attributes: local entry point.  */
+
+static void
+ppc64_elf_merge_symbol_attribute (struct elf_link_hash_entry *h,
+				  const Elf_Internal_Sym *isym,
+				  bfd_boolean definition,
+				  bfd_boolean dynamic)
+{
+  if (definition && !dynamic)
+    h->other = ((isym->st_other & ~ELF_ST_VISIBILITY (-1))
+		| ELF_ST_VISIBILITY (h->other));
 }
 
 /* This function makes an old ABI object reference to ".bar" cause the
@@ -9586,7 +9618,8 @@ ppc_type_of_stub (asection *input_sec,
 		  const Elf_Internal_Rela *rel,
 		  struct ppc_link_hash_entry **hash,
 		  struct plt_entry **plt_ent,
-		  bfd_vma destination)
+		  bfd_vma destination,
+		  unsigned long local_off)
 {
   struct ppc_link_hash_entry *h = *hash;
   bfd_vma location;
@@ -9655,7 +9688,7 @@ ppc_type_of_stub (asection *input_sec,
   if (r_type != R_PPC64_REL24)
     max_branch_offset = 1 << 15;
 
-  if (branch_offset + max_branch_offset >= 2 * max_branch_offset)
+  if (branch_offset + max_branch_offset >= 2 * max_branch_offset - local_off)
     /* We need a stub.  Figure out whether a long_branch or plt_branch
        is needed later.  */
     return ppc_stub_long_branch;
@@ -10023,9 +10056,11 @@ ppc_build_one_stub (struct bfd_hash_entry *gen_entry, void *in_arg)
     case ppc_stub_long_branch:
     case ppc_stub_long_branch_r2off:
       /* Branches are relative.  This is where we are going to.  */
-      off = dest = (stub_entry->target_value
-		    + stub_entry->target_section->output_offset
-		    + stub_entry->target_section->output_section->vma);
+      dest = (stub_entry->target_value
+	      + stub_entry->target_section->output_offset
+	      + stub_entry->target_section->output_section->vma);
+      dest += PPC64_LOCAL_ENTRY_OFFSET (stub_entry->other);
+      off = dest;
 
       /* And this is where we are coming from.  */
       off -= (stub_entry->stub_offset
@@ -10128,6 +10163,8 @@ ppc_build_one_stub (struct bfd_hash_entry *gen_entry, void *in_arg)
       dest = (stub_entry->target_value
 	      + stub_entry->target_section->output_offset
 	      + stub_entry->target_section->output_section->vma);
+      if (stub_entry->stub_type != ppc_stub_plt_branch_r2off)
+	dest += PPC64_LOCAL_ENTRY_OFFSET (stub_entry->other);
 
       bfd_put_64 (htab->brlt->owner, dest,
 		  htab->brlt->contents + br_entry->offset);
@@ -10472,6 +10509,7 @@ ppc_size_one_stub (struct bfd_hash_entry *gen_entry, void *in_arg)
       /* ppc_stub_long_branch or ppc_stub_plt_branch, or their r2off
 	 variants.  */
       bfd_vma r2off = 0;
+      bfd_vma local_off = 0;
 
       off = (stub_entry->target_value
 	     + stub_entry->target_section->output_offset
@@ -10500,8 +10538,10 @@ ppc_size_one_stub (struct bfd_hash_entry *gen_entry, void *in_arg)
 	  off -= size - 4;
 	}
 
+      local_off = PPC64_LOCAL_ENTRY_OFFSET (stub_entry->other);
+
       /* If the branch offset if too big, use a ppc_stub_plt_branch.  */
-      if (off + (1 << 25) >= (bfd_vma) (1 << 26))
+      if (off + (1 << 25) >= (bfd_vma) (1 << 26) - local_off)
 	{
 	  struct ppc_branch_hash_entry *br_entry;
 
@@ -11097,7 +11137,10 @@ toc_adjusting_stub_needed (struct bfd_link_info *info, asection *isec)
 	     need a plt_branch stub.  A plt_branch stub uses r2.  */
 	  else if (dest - (isec->output_offset
 			   + isec->output_section->vma
-			   + rel->r_offset) + (1 << 25) >= (2 << 25))
+			   + rel->r_offset) + (1 << 25)
+		   >= (2u << 25) - PPC64_LOCAL_ENTRY_OFFSET (h
+							     ? h->other
+							     : sym->st_other))
 	    {
 	      ret = 1;
 	      break;
@@ -11553,6 +11596,7 @@ ppc64_elf_size_stubs (struct bfd_link_info *info, bfd_signed_vma group_size,
 		  asection *sym_sec, *code_sec;
 		  bfd_vma sym_value, code_value;
 		  bfd_vma destination;
+		  unsigned long local_off;
 		  bfd_boolean ok_dest;
 		  struct ppc_link_hash_entry *hash;
 		  struct ppc_link_hash_entry *fdh;
@@ -11629,12 +11673,16 @@ ppc64_elf_size_stubs (struct bfd_link_info *info, bfd_signed_vma group_size,
 		    }
 
 		  destination = 0;
+		  local_off = 0;
 		  if (ok_dest)
 		    {
 		      sym_value += irela->r_addend;
 		      destination = (sym_value
 				     + sym_sec->output_offset
 				     + sym_sec->output_section->vma);
+		      local_off = PPC64_LOCAL_ENTRY_OFFSET (hash
+							    ? hash->elf.other
+							    : sym->st_other);
 		    }
 
 		  code_sec = sym_sec;
@@ -11671,7 +11719,8 @@ ppc64_elf_size_stubs (struct bfd_link_info *info, bfd_signed_vma group_size,
 		  /* Determine what (if any) linker stub is needed.  */
 		  plt_ent = NULL;
 		  stub_type = ppc_type_of_stub (section, irela, &hash,
-						&plt_ent, destination);
+						&plt_ent, destination,
+						local_off);
 
 		  if (stub_type != ppc_stub_plt_call)
 		    {
@@ -11771,6 +11820,7 @@ ppc64_elf_size_stubs (struct bfd_link_info *info, bfd_signed_vma group_size,
 		    }
 		  stub_entry->h = hash;
 		  stub_entry->plt_ent = plt_ent;
+		  stub_entry->other = hash ? hash->elf.other : sym->st_other;
 		  stub_entry->addend = irela->r_addend;
 
 		  if (stub_entry->h != NULL)
@@ -13104,6 +13154,10 @@ ppc64_elf_relocate_section (bfd *output_bfd,
 	  from = (rel->r_offset
 		  + input_section->output_offset
 		  + input_section->output_section->vma);
+
+	  relocation += PPC64_LOCAL_ENTRY_OFFSET (fdh
+						  ? fdh->elf.other
+						  : sym->st_other);
 
 	  if (stub_entry != NULL
 	      && (stub_entry->stub_type == ppc_stub_long_branch
