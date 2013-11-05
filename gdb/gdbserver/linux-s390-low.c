@@ -32,6 +32,10 @@
 #define HWCAP_S390_HIGH_GPRS 512
 #endif
 
+#ifndef HWCAP_S390_TE
+#define HWCAP_S390_TE 1024
+#endif
+
 #ifndef PTRACE_GETREGSET
 #define PTRACE_GETREGSET 0x4204
 #endif
@@ -390,23 +394,6 @@ s390_arch_setup (void)
     = s390_check_regset (pid, NT_S390_SYSTEM_CALL, 4);
   int have_regset_tdb = s390_check_regset (pid, NT_S390_TDB, 256);
 
-  /* Update target_regsets according to available register sets.  */
-  for (regset = target_regsets; regset->fill_function != NULL; regset++)
-    if (regset->get_request == PTRACE_GETREGSET)
-      switch (regset->nt_type)
-	{
-	case NT_S390_LAST_BREAK:
-	  regset->size = have_regset_last_break? 8 : 0;
-	  break;
-	case NT_S390_SYSTEM_CALL:
-	  regset->size = have_regset_system_call? 4 : 0;
-	  break;
-	case NT_S390_TDB:
-	  regset->size = have_regset_tdb ? 256 : 0;
-	default:
-	  break;
-	}
-
   /* Assume 31-bit inferior process.  */
   if (have_regset_system_call)
     init_registers_s390_linux32v2 ();
@@ -424,6 +411,7 @@ s390_arch_setup (void)
   {
     unsigned int pswm;
     struct regcache *regcache = new_register_cache ();
+
     fetch_inferior_registers (regcache, find_regno ("pswm"));
     collect_register_by_name (regcache, "pswm", &pswm);
     free_register_cache (regcache);
@@ -431,8 +419,12 @@ s390_arch_setup (void)
     if (pswm & 1)
       {
 	if (have_regset_tdb)
+	  have_regset_tdb =
+	    (s390_get_hwcap () & HWCAP_S390_TE) != 0;
+
+	if (have_regset_tdb)
 	  init_registers_s390x_te_linux64 ();
-	if (have_regset_system_call)
+	else if (have_regset_system_call)
 	  init_registers_s390x_linux64v2 ();
 	else if (have_regset_last_break)
 	  init_registers_s390x_linux64v1 ();
@@ -444,6 +436,9 @@ s390_arch_setup (void)
        using the full 64-bit GPRs.  */
     else if (s390_get_hwcap () & HWCAP_S390_HIGH_GPRS)
       {
+	if (have_regset_tdb)
+	  have_regset_tdb = (s390_get_hwcap () & HWCAP_S390_TE) != 0;
+
 	if (have_regset_tdb)
 	  init_registers_s390_te_linux64 ();
 	if (have_regset_system_call)
@@ -458,6 +453,22 @@ s390_arch_setup (void)
       }
   }
 #endif
+  /* Update target_regsets according to available register sets.  */
+  for (regset = target_regsets; regset->fill_function != NULL; regset++)
+    if (regset->get_request == PTRACE_GETREGSET)
+      switch (regset->nt_type)
+	{
+	case NT_S390_LAST_BREAK:
+	  regset->size = have_regset_last_break? 8 : 0;
+	  break;
+	case NT_S390_SYSTEM_CALL:
+	  regset->size = have_regset_system_call? 4 : 0;
+	  break;
+	case NT_S390_TDB:
+	  regset->size = have_regset_tdb ? 256 : 0;
+	default:
+	  break;
+	}
 }
 
 
