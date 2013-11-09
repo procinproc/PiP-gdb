@@ -1,0 +1,89 @@
+# Copyright 2013 Free Software Foundation, Inc.
+
+# This program is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation; either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+# This file is part of the gdb testsuite
+
+# Test expressions which assume an implicit "this" with a qualified
+# name.
+
+if {[skip_cplus_tests]} { continue }
+
+standard_testfile .cc
+
+if {[prepare_for_testing $testfile.exp $testfile $srcfile {debug c++}]} {
+    return -1
+}
+
+# First test expressions when there is no context.
+gdb_test "print i" "No symbol \"i\" in current context."
+gdb_test "print D::i" "Cannot reference non-static field \"i\""
+gdb_test "print D::B::i" "Cannot reference non-static field \"i\""
+gdb_test "print B::i" "Cannot reference non-static field \"i\""
+gdb_test "print D::C::i" "Cannot reference non-static field \"i\""
+gdb_test "print C::i" "Cannot reference non-static field \"i\""
+gdb_test "print D::B::A::i" "Cannot reference non-static field \"i\""
+gdb_test "print B::A::i" "Cannot reference non-static field \"i\""
+gdb_test "print A::i" "Cannot reference non-static field \"i\""
+gdb_test "print D::C::A::i" "Cannot reference non-static field \"i\""
+gdb_test "print C::A::i" "Cannot reference non-static field \"i\""
+gdb_test "print D::x" "Cannot reference non-static field \"x\""
+gdb_test "print x" "No symbol \"x\" in current context."
+gdb_test "print D::C::c" "Cannot reference non-static field \"c\""
+gdb_test "print C::c" "Cannot reference non-static field \"c\""
+gdb_test "print c" "No symbol \"c\" in current context."
+
+# Run to D::f.
+if {![runto_main]} {
+    perror "couldn't run to main"
+    continue
+}
+
+gdb_breakpoint "D::f"
+gdb_continue_to_breakpoint "run to D::f"
+
+# Now test valid expressions in the class hierarchy for D.
+gdb_test "print i" "= 4"
+gdb_test "print D::i" "= 4"
+gdb_test "print D::B::i" "= 2"
+gdb_test "print B::i" "= 2"
+gdb_test "print D::C::i" "= 3"
+gdb_test "print C::i" "= 3"
+gdb_test "print D::B::A::i" "= 1"
+gdb_test "print B::A::i" "= 1"
+gdb_test "print A::i" "= 1"
+gdb_test "print D::C::A::i" "= 1"
+gdb_test "print C::A::i" "= 1"
+gdb_test "print D::x" "= 40"
+gdb_test "print x" "= 40"
+gdb_test "print D::C::c" "= 30"
+gdb_test "print C::c" "= 30"
+gdb_test "print c" "= 30"
+
+# Test some invalid expressions
+gdb_test "print D::B::c" "There is no field named c"
+gdb_test "print D::B::A::c" "There is no field named c"
+gdb_test "print D::C::A::c" "There is no field named c"
+gdb_test "print B::c" "There is no field named c"
+gdb_test "print B::A::c" "There is no field named c"
+gdb_test "print C::A::c" "There is no field named c"
+gdb_test "print D::B::x" "There is no field named x"
+gdb_test "print D::B::A::x" "There is no field named x"
+gdb_test "print B::x" "There is no field named x"
+gdb_test "print B::A::x" "There is no field named x"
+gdb_test "print D::C::x" "There is no field named x"
+gdb_test "print C::x" "There is no field named x"
+gdb_test "print D::C::A::x" "There is no field named x"
+gdb_test "print C::A::x" "There is no field named x"
+

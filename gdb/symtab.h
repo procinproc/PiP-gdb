@@ -1318,4 +1318,9 @@ void iterate_over_symbols (const struct block *block, const char *name,
 struct cleanup *demangle_for_lookup (const char *name, enum language lang,
 				     const char **result_name);
 
+/* See comment in symtab.c.  */
+
+int check_field (struct type *type, const char *name,
+		 struct field_of_this_result *is_a_field_of_this);
+
 #endif /* !defined(SYMTAB_H) */

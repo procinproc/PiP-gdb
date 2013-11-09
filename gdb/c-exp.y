@@ -2890,6 +2890,30 @@ classify_inner_name (const struct block *block, struct type *context)
     {
     case LOC_BLOCK:
     case LOC_LABEL:
+      {
+	struct field_of_this_result fot;
+
+	/* We might have erroneously found a constructor where we wanted
+	   a type name.  The trick is ascertaining what the user wanted.
+	   If cp_lookup_nested_symbol found a constructor, but it is for a
+	   different type than CONTEXT, then this is really a type, not a
+	   constructor.  Look for the type and return that.  */
+	memset (&fot, 0, sizeof (fot));
+	check_field (type, copy, &fot);
+	if (fot.fn_field != NULL
+	    && TYPE_FN_FIELD_CONSTRUCTOR (fot.fn_field->fn_fields, 0)
+	    && !types_equal (type, fot.type))
+	  {
+	    struct symbol *sym;
+
+	    sym = lookup_symbol (copy, block, STRUCT_DOMAIN, NULL);
+	    if (sym != NULL)
+	      {
+		yylval.tsym.type = SYMBOL_TYPE (sym);
+		return TYPENAME;
+	      }
+	  }
+      }
       return ERROR;
 
     case LOC_TYPEDEF:

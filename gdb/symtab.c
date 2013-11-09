@@ -1260,7 +1260,7 @@ lookup_language_this (const struct language_defn *lang,
    return 1 if the component named NAME from the ultimate target
    structure/union is defined, otherwise, return 0.  */
 
-static int
+int
 check_field (struct type *type, const char *name,
 	     struct field_of_this_result *is_a_field_of_this)
 {
