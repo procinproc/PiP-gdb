@@ -2403,15 +2403,16 @@ amd64_frame_this_id (struct frame_info *this_frame, void **this_cache,
   struct gdbarch_tdep *tdep = gdbarch_tdep (get_frame_arch (this_frame));
 
   if (!cache->base_p)
-    return;
-
-  /* This marks the outermost frame.  */
-  if (cache->base == 0)
-    return;
-
-  /* Detect OS dependent outermost frames; such as `clone'.  */
-  if (tdep->outermost_frame_p && tdep->outermost_frame_p (this_frame))
-    return;
+    (*this_id) = frame_id_build_unavailable_stack (cache->pc);
+  else if (cache->base == 0)
+    {
+      /* This marks the outermost frame.  */
+      return;
+    }
+  else
+    /* Detect OS dependent outermost frames; such as `clone'.  */
+    if (tdep->outermost_frame_p && tdep->outermost_frame_p (this_frame))
+      return;
 
   (*this_id) = frame_id_build (cache->base + 16, cache->pc);
 }
@@ -2528,9 +2529,14 @@ amd64_sigtramp_frame_this_id (struct frame_info *this_frame,
     amd64_sigtramp_frame_cache (this_frame, this_cache);
 
   if (!cache->base_p)
-    return;
-
-  (*this_id) = frame_id_build (cache->base + 16, get_frame_pc (this_frame));
+    (*this_id) = frame_id_build_unavailable_stack (get_frame_pc (this_frame));
+  else if (cache->base == 0)
+    {
+      /* This marks the outermost frame.  */
+      return;
+    }
+  else
+    (*this_id) = frame_id_build (cache->base + 16, get_frame_pc (this_frame));
 }
 
 static struct value *
@@ -2699,9 +2705,9 @@ amd64_epilogue_frame_this_id (struct frame_info *this_frame,
 							       this_cache);
 
   if (!cache->base_p)
-    return;
-
-  (*this_id) = frame_id_build (cache->base + 8, cache->pc);
+    (*this_id) = frame_id_build_unavailable_stack (cache->pc);
+  else
+    (*this_id) = frame_id_build (cache->base + 8, cache->pc);
 }
 
 static const struct frame_unwind amd64_epilogue_frame_unwind =
