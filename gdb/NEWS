@@ -30,6 +30,8 @@ qXfer:libraries-svr4:read's annex
 
 *** Changes in GDB 7.6
 
+* GDB now supports SystemTap SDT probes on AArch64 GNU/Linux.
+
 * Target record has been renamed to record-full.
   Record/replay is now enabled with the "record full" command.
   This also affects settings that are associated with full record/replay
