@@ -249,7 +249,10 @@ class FrameVars(object):
         are no frame local variables, return an empty list."""
         lvars = []
 
-        block = self.frame.block()
+        try:
+            block = self.frame.block()
+        except RuntimeError:
+            block = None
 
         while block != None:
             if block.is_global or block.is_static:
@@ -270,7 +273,12 @@ class FrameVars(object):
         there are no frame argument variables, return an empty list."""
 
         args = []
-        block = self.frame.block()
+
+        try:
+            block = self.frame.block()
+        except RuntimeError:
+            block = None
+
         while block != None:
             if block.function != None:
                 break
