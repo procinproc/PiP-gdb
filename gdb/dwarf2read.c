@@ -1057,6 +1057,9 @@ struct die_info
        type derived from this DIE.  */
     unsigned char building_fullname : 1;
 
+    /* True if this die is in process.  PR 16581.  */
+    unsigned char in_process : 1;
+
     /* Abbrev number */
     unsigned int abbrev;
 
@@ -7190,11 +7193,28 @@ process_imported_unit_die (struct die_info *die, struct dwarf2_cu *cu)
     }
 }
 
+/* Reset the in_process bit of a die.  */
+
+static void
+reset_die_in_process (void *arg)
+{
+  struct die_info *die = arg;
+  die->in_process = 0;
+}
+
 /* Process a die and its children.  */
 
 static void
 process_die (struct die_info *die, struct dwarf2_cu *cu)
 {
+  struct cleanup *in_process;
+
+  /* We should only be processing those not already in process.  */
+  gdb_assert (!die->in_process);
+
+  die->in_process = 1;
+  in_process = make_cleanup (reset_die_in_process,die);
+
   switch (die->tag)
     {
     case DW_TAG_padding:
@@ -7278,6 +7298,8 @@ process_die (struct die_info *die, struct dwarf2_cu *cu)
       new_symbol (die, NULL, cu);
       break;
     }
+
+  do_cleanups (in_process);
 }
 
 /* A helper function for dwarf2_compute_name which determines whether DIE
@@ -9428,8 +9450,12 @@ inherit_abstract_dies (struct die_info *die, struct dwarf2_cu *cu)
       if (offsetp >= offsets_end
 	  || offsetp->sect_off > origin_child_die->offset.sect_off)
 	{
-	  /* Found that ORIGIN_CHILD_DIE is really not referenced.  */
-	  process_die (origin_child_die, origin_cu);
+	  /* Found that ORIGIN_CHILD_DIE is really not referenced.
+	     Check whether we're already processing ORIGIN_CHILD_DIE.
+	     This can happen with mutually referenced abstract_origins.
+	     PR 16581.  */
+	  if (!origin_child_die->in_process)
+	    process_die (origin_child_die, origin_cu);
 	}
       origin_child_die = sibling_die (origin_child_die);
     }
