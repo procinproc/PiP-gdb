@@ -272,6 +272,9 @@ struct dwarf2_per_objfile
 
   /* The CUs we recently read.  */
   VEC (dwarf2_per_cu_ptr) *just_read_cus;
+
+  /* Table containing line_header indexed by offset and offset_in_dwz.  */
+  htab_t line_header_hash;
 };
 
 static struct dwarf2_per_objfile *dwarf2_per_objfile;
@@ -861,6 +864,12 @@ typedef void (die_reader_func_ftype) (const struct die_reader_specs *reader,
    which contains the following information.  */
 struct line_header
 {
+  /* Offset of line number information in .debug_line section.  */
+  sect_offset offset;
+
+  /* OFFSET is for struct dwz_file associated with dwarf2_per_objfile.  */
+  unsigned offset_in_dwz : 1;
+
   unsigned int total_length;
   unsigned short version;
   unsigned int header_length;
@@ -1413,7 +1422,7 @@ static struct line_header *dwarf_decode_line_header (unsigned int offset,
 
 static void dwarf_decode_lines (struct line_header *, const char *,
 				struct dwarf2_cu *, struct partial_symtab *,
-				int);
+				int, int decode_mapping);
 
 static void dwarf2_start_subfile (char *, const char *, const char *);
 
@@ -1745,6 +1754,8 @@ static void free_dwo_file_cleanup (void *);
 static void process_cu_includes (void);
 
 static void check_producer (struct dwarf2_cu *cu);
+
+static void free_line_header_voidp (void *arg);
 
 #if WORDS_BIGENDIAN
 
@@ -2141,6 +2152,29 @@ dwarf2_get_dwz_file (void)
   dwarf2_per_objfile->dwz_file = result;
   return result;
 }
+
+/* Hash function for line_header_hash.  */
+
+static hashval_t
+line_header_hash (const void *item)
+{
+  const struct line_header *ofs = item;
+
+  return ofs->offset.sect_off ^ ofs->offset_in_dwz;
+}
+
+/* Equality function for line_header_hash.  */
+
+static int
+line_header_eq (const void *item_lhs, const void *item_rhs)
+{
+  const struct line_header *ofs_lhs = item_lhs;
+  const struct line_header *ofs_rhs = item_rhs;
+
+  return (ofs_lhs->offset.sect_off == ofs_rhs->offset.sect_off
+	  && ofs_lhs->offset_in_dwz == ofs_rhs->offset_in_dwz);
+}
+
 
 /* DWARF quick_symbols_functions support.  */
 
@@ -4139,7 +4173,7 @@ dwarf2_build_include_psymtabs (struct dwarf2_cu *cu,
     return;  /* No linetable, so no includes.  */
 
   /* NOTE: pst->dirname is DW_AT_comp_dir (if present).  */
-  dwarf_decode_lines (lh, pst->dirname, cu, pst, 1);
+  dwarf_decode_lines (lh, pst->dirname, cu, pst, 1, 1);
 
   free_line_header (lh);
 }
@@ -7969,24 +8003,64 @@ static void
 handle_DW_AT_stmt_list (struct die_info *die, struct dwarf2_cu *cu,
 			const char *comp_dir)
 {
+  struct objfile *objfile = dwarf2_per_objfile->objfile;
   struct attribute *attr;
+  unsigned int line_offset;
+  struct line_header *line_header, line_header_local;
+  unsigned u;
+  void **slot;
+  int decode_mapping;
 
   gdb_assert (! cu->per_cu->is_debug_types);
 
   attr = dwarf2_attr (die, DW_AT_stmt_list, cu);
-  if (attr)
-    {
-      unsigned int line_offset = DW_UNSND (attr);
-      struct line_header *line_header
-	= dwarf_decode_line_header (line_offset, cu);
+  if (attr == NULL)
+    return;
 
-      if (line_header)
-	{
-	  cu->line_header = line_header;
-	  make_cleanup (free_cu_line_header, cu);
-	  dwarf_decode_lines (line_header, comp_dir, cu, NULL, 1);
-	}
+  line_offset = DW_UNSND (attr);
+
+  if (dwarf2_per_objfile->line_header_hash == NULL)
+    {
+      dwarf2_per_objfile->line_header_hash
+	= htab_create_alloc_ex (127, line_header_hash, line_header_eq,
+				free_line_header_voidp,
+				&objfile->objfile_obstack,
+				hashtab_obstack_allocate,
+				dummy_obstack_deallocate);
     }
+
+  line_header_local.offset.sect_off = line_offset;
+  line_header_local.offset_in_dwz = cu->per_cu->is_dwz;
+  slot = htab_find_slot (dwarf2_per_objfile->line_header_hash,
+			 &line_header_local, NO_INSERT);
+
+  /* For DW_TAG_compile_unit we need info like symtab::linetable which
+     is not present in *SLOT.  */
+  if (die->tag == DW_TAG_partial_unit && slot != NULL)
+    {
+      gdb_assert (*slot != NULL);
+      cu->line_header = *slot;
+      return;
+    }
+
+  line_header = dwarf_decode_line_header (line_offset, cu);
+  if (line_header == NULL)
+    return;
+  cu->line_header = line_header;
+
+  slot = htab_find_slot (dwarf2_per_objfile->line_header_hash,
+			 &line_header_local, INSERT);
+  gdb_assert (slot != NULL);
+  if (*slot == NULL)
+    *slot = line_header;
+  else
+    {
+      gdb_assert (die->tag != DW_TAG_partial_unit);
+      make_cleanup (free_cu_line_header, cu);
+    }
+  decode_mapping = (die->tag != DW_TAG_partial_unit);
+  dwarf_decode_lines (line_header, comp_dir, cu, NULL, 1,
+		      decode_mapping);
 }
 
 /* Process DW_TAG_compile_unit or DW_TAG_partial_unit.  */
@@ -15203,6 +15277,16 @@ free_line_header (struct line_header *lh)
   xfree (lh);
 }
 
+/* Stub for free_line_header to match void * callback types.  */
+
+static void
+free_line_header_voidp (void *arg)
+{
+  struct line_header *lh = arg;
+
+  free_line_header (lh);
+}
+
 /* Add an entry to LH's include directory table.  */
 
 static void
@@ -15332,6 +15416,9 @@ dwarf_decode_line_header (unsigned int offset, struct dwarf2_cu *cu)
   memset (lh, 0, sizeof (*lh));
   back_to = make_cleanup ((make_cleanup_ftype *) free_line_header,
                           (void *) lh);
+
+  lh->offset.sect_off = offset;
+  lh->offset_in_dwz = cu->per_cu->is_dwz;
 
   line_ptr = section->buffer + offset;
 
@@ -15826,18 +15913,22 @@ dwarf_decode_lines_1 (struct line_header *lh, const char *comp_dir,
    as the corresponding symtab.  Since COMP_DIR is not used in the name of the
    symtab we don't use it in the name of the psymtabs we create.
    E.g. expand_line_sal requires this when finding psymtabs to expand.
-   A good testcase for this is mb-inline.exp.  */
+   A good testcase for this is mb-inline.exp.
+
+   Boolean DECODE_MAPPING specifies we need to fully decode .debug_line
+   for its PC<->lines mapping information.  Otherwise only filenames
+   tables is read in.  */
 
 static void
 dwarf_decode_lines (struct line_header *lh, const char *comp_dir,
 		    struct dwarf2_cu *cu, struct partial_symtab *pst,
-		    int want_line_info)
+		    int want_line_info, int decode_mapping)
 {
   struct objfile *objfile = cu->objfile;
   const int decode_for_pst_p = (pst != NULL);
   struct subfile *first_subfile = current_subfile;
 
-  if (want_line_info)
+  if (want_line_info && decode_mapping)
     dwarf_decode_lines_1 (lh, comp_dir, cu, pst);
 
   if (decode_for_pst_p)
