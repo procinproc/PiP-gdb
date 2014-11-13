@@ -1,6 +1,12 @@
 		What has changed in GDB?
 	     (Organized release by release)
 
+* New commands:
+
+add-auto-load-scripts-directory directory
+  Add entries to the list of directories from which to load auto-loaded
+  scripts.
+
 * Newly installed $prefix/bin/gcore acts as a shell interface for the
   GDB command gcore.
 
