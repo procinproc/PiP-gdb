@@ -968,6 +968,10 @@ print_command_1 (char *exp, int voidprint)
 
   if (exp && *exp)
     {
+      /* '*((int *(*) (void)) __errno_location) ()' is incompatible with
+	 function descriptors.  */
+      if (target_has_execution && strcmp (exp, "errno") == 0)
+	exp = "*(*(int *(*)(void)) __errno_location) ()";
       expr = parse_expression (exp);
       old_chain = make_cleanup (free_current_contents, &expr);
       cleanup = 1;
