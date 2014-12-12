@@ -4080,8 +4080,6 @@ regsets_fetch_inferior_registers (struct regcache *regcache)
 	      /* If we get EIO on a regset, do not try it again for
 		 this process.  */
 	      disabled_regsets[regset - target_regsets] = 1;
-	      free (buf);
-	      continue;
 	    }
 	  else
 	    {
@@ -4091,9 +4089,12 @@ regsets_fetch_inferior_registers (struct regcache *regcache)
 	      perror (s);
 	    }
 	}
-      else if (regset->type == GENERAL_REGS)
-	saw_general_regs = 1;
-      regset->store_function (regcache, buf);
+      else
+	{
+	  if (regset->type == GENERAL_REGS)
+	    saw_general_regs = 1;
+	  regset->store_function (regcache, buf);
+	}
       regset ++;
       free (buf);
     }

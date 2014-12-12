@@ -47,6 +47,9 @@ get_thread_regcache (struct thread_info *thread, int fetch)
       struct thread_info *saved_inferior = current_inferior;
 
       current_inferior = thread;
+      /* Invalidate all registers, to prevent stale left-overs.  */
+      memset (regcache->register_status, REG_UNAVAILABLE,
+	      num_registers);
       fetch_inferior_registers (regcache, -1);
       current_inferior = saved_inferior;
       regcache->registers_valid = 1;
