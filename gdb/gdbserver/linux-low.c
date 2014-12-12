@@ -4183,6 +4183,12 @@ regsets_store_inferior_registers (struct regcache *regcache)
 	      free (buf);
 	      return 0;
 	    }
+	  else if (errno == ENODATA)
+	    {
+	      /* ENODATA may be returned if the regset is currently
+		 not "active".  This can happen in normal operation,
+		 so suppress the warning in this case.  */
+	    }
 	  else
 	    {
 	      perror ("Warning: ptrace(regsets_store_inferior_registers)");
