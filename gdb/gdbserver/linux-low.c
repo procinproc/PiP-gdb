@@ -4120,7 +4120,8 @@ regsets_store_inferior_registers (struct regcache *regcache)
       void *buf, *data;
       int nt_type, res;
 
-      if (regset->size == 0 || disabled_regsets[regset - target_regsets])
+      if (regset->size == 0 || disabled_regsets[regset - target_regsets]
+	  || regset->fill_function == NULL)
 	{
 	  regset ++;
 	  continue;
