@@ -3405,7 +3405,6 @@ rs6000_epilogue_frame_cache (struct frame_info *this_frame, void **this_cache)
   struct rs6000_frame_cache *cache;
   struct gdbarch *gdbarch = get_frame_arch (this_frame);
   struct gdbarch_tdep *tdep = gdbarch_tdep (gdbarch);
-  CORE_ADDR sp;
 
   if (*this_cache)
     return *this_cache;
@@ -4006,8 +4005,8 @@ ppc_process_record_op4 (struct gdbarch *gdbarch, struct regcache *regcache,
       return 0;
     }
 
-  fprintf_unfiltered (gdb_stdlog, "Warning: Don't know how to record "
-		      "%08x at %08lx, 4-%d.\n", insn, addr, ext);
+  fprintf_unfiltered (gdb_stdlog, "Warning: Don't know how to record %08x "
+		      "at %s, 4-%d.\n", insn, paddress (gdbarch, addr), ext);
   return -1;
 }
 
@@ -4049,8 +4048,8 @@ ppc_process_record_op19 (struct gdbarch *gdbarch, struct regcache *regcache,
       return 0;
     }
 
-  fprintf_unfiltered (gdb_stdlog, "Warning: Don't know how to record "
-		      "%08x at %08lx, 19-%d.\n", insn, addr, ext);
+  fprintf_unfiltered (gdb_stdlog, "Warning: Don't know how to record %08x "
+		      "at %s, 19-%d.\n", insn, paddress (gdbarch, addr), ext);
   return -1;
 }
 
@@ -4510,7 +4509,8 @@ ppc_process_record_op31 (struct gdbarch *gdbarch, struct regcache *regcache,
     case 878:		/* Transaction Abort Doubleword Conditional Immediate */
     case 910:		/* Transaction Abort */
       fprintf_unfiltered (gdb_stdlog, "Cannot record Transaction instructions. "
-			  "%08x at %08lx, 31-%d.\n", insn, addr, ext);
+			  "%08x at %s, 31-%d.\n",
+			  insn, paddress (gdbarch, addr), ext);
       return -1;
 
     case 1014:		/* Data Cache Block set to Zero */
@@ -4531,8 +4531,8 @@ ppc_process_record_op31 (struct gdbarch *gdbarch, struct regcache *regcache,
     }
 
 UNKNOWN_OP:
-  fprintf_unfiltered (gdb_stdlog, "Warning: Don't know how to record "
-		      "%08x at %08lx, 31-%d.\n", insn, addr, ext);
+  fprintf_unfiltered (gdb_stdlog, "Warning: Don't know how to record %08x "
+		      "at %s, 31-%d.\n", insn, paddress (gdbarch, addr), ext);
   return -1;
 }
 
@@ -4623,8 +4623,8 @@ ppc_process_record_op59 (struct gdbarch *gdbarch, struct regcache *regcache,
       return 0;
     }
 
-  fprintf_unfiltered (gdb_stdlog, "Warning: Don't know how to record "
-		      "%08x at %08lx, 59-%d.\n", insn, addr, ext);
+  fprintf_unfiltered (gdb_stdlog, "Warning: Don't know how to record %08x "
+		      "at %s, 59-%d.\n", insn, paddress (gdbarch, addr), ext);
   return -1;
 }
 
@@ -4636,7 +4636,6 @@ ppc_process_record_op60 (struct gdbarch *gdbarch, struct regcache *regcache,
 {
   struct gdbarch_tdep *tdep = gdbarch_tdep (gdbarch);
   int ext = PPC_EXTOP (insn);
-  int tmp;
 
   switch (ext >> 2)
     {
@@ -4906,8 +4905,8 @@ ppc_process_record_op60 (struct gdbarch *gdbarch, struct regcache *regcache,
       return 0;
     }
 
-  fprintf_unfiltered (gdb_stdlog, "Warning: Don't know how to record "
-		      "%08x at %08lx, 60-%d.\n", insn, addr, ext);
+  fprintf_unfiltered (gdb_stdlog, "Warning: Don't know how to record %08x "
+		      "at %s, 60-%d.\n", insn, paddress (gdbarch, addr), ext);
   return -1;
 }
 
@@ -5072,8 +5071,8 @@ ppc_process_record_op63 (struct gdbarch *gdbarch, struct regcache *regcache,
 
     }
 
-  fprintf_unfiltered (gdb_stdlog, "Warning: Don't know how to record "
-		      "%08x at %08lx, 59-%d.\n", insn, addr, ext);
+  fprintf_unfiltered (gdb_stdlog, "Warning: Don't know how to record %08x "
+		      "at %s, 59-%d.\n", insn, paddress (gdbarch, addr), ext);
   return -1;
 }
 
@@ -5355,8 +5354,8 @@ ppc_process_record (struct gdbarch *gdbarch, struct regcache *regcache,
 
     default:
 UNKNOWN_OP:
-      fprintf_unfiltered (gdb_stdlog, "Warning: Don't know how to record "
-			  "%08x at %08lx, %d.\n", insn, addr, op6);
+      fprintf_unfiltered (gdb_stdlog, "Warning: Don't know how to record %08x "
+			  "at %s, %d.\n", insn, paddress (gdbarch, addr), op6);
       return -1;
     }
 
