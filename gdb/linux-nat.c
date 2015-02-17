@@ -1397,7 +1397,22 @@ linux_nat_post_attach_wait (ptid_t ptid, int first, int *cloned,
       *cloned = 1;
     }
 
-  gdb_assert (pid == new_pid);
+  if (new_pid != pid)
+    {
+      int saved_errno = errno;
+
+      /* Unexpected waitpid result.  EACCES has been observed on RHEL
+	 6.5 (RH BZ #1162264).  This is most likely a kernel bug, thus
+	 out of our control, so treat it as invalid input.  The LWP's
+	 state is indeterminate at this point, so best we can do is
+	 error out, otherwise we'd probably end up wedged later on.
+
+	 In case we're still attached.  */
+      ptrace (PTRACE_DETACH, pid, 0, 0);
+
+      errno = saved_errno;
+      perror_with_name (_("waitpid"));
+    }
 
   if (!WIFSTOPPED (status))
     {
@@ -1621,7 +1636,7 @@ static void
 linux_nat_attach (struct target_ops *ops, char *args, int from_tty)
 {
   struct lwp_info *lp;
-  int status;
+  int status = 0;
   ptid_t ptid;
   volatile struct gdb_exception ex;
 
@@ -1659,8 +1674,19 @@ linux_nat_attach (struct target_ops *ops, char *args, int from_tty)
   /* Add the initial process as the first LWP to the list.  */
   lp = add_initial_lwp (ptid);
 
-  status = linux_nat_post_attach_wait (lp->ptid, 1, &lp->cloned,
-				       &lp->signalled);
+  TRY_CATCH (ex, RETURN_MASK_ERROR)
+    {
+      status = linux_nat_post_attach_wait (lp->ptid, 1, &lp->cloned,
+					   &lp->signalled);
+    }
+  if (ex.reason < 0)
+    {
+      target_terminal_ours ();
+      target_mourn_inferior ();
+
+      error (_("Unable to attach: %s"), ex.message);
+    }
+
   if (!WIFSTOPPED (status))
     {
       if (WIFEXITED (status))
