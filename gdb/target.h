@@ -462,6 +462,16 @@ struct target_ops
     void (*to_files_info) (struct target_ops *);
     int (*to_insert_breakpoint) (struct gdbarch *, struct bp_target_info *);
     int (*to_remove_breakpoint) (struct gdbarch *, struct bp_target_info *);
+
+    /* Returns true if the target stopped for a hardware breakpoint.
+       Likewise, if the target supports hardware breakpoints, this
+       method is necessary for correct background execution / non-stop
+       mode operation.  Even though hardware breakpoints do not
+       require PC adjustment, GDB needs to be able to tell whether the
+       hardware breakpoint event is a delayed event for a breakpoint
+       that is already gone and should thus be ignored.  */
+    int (*to_stopped_by_hw_breakpoint) (struct target_ops *);
+
     int (*to_can_use_hw_breakpoint) (int, int, int);
     int (*to_ranged_break_num_registers) (struct target_ops *);
     int (*to_insert_hw_breakpoint) (struct gdbarch *, struct bp_target_info *);
@@ -1547,6 +1557,9 @@ extern char *target_thread_name (struct thread_info *);
 
 #define target_stopped_by_watchpoint \
    (*current_target.to_stopped_by_watchpoint)
+
+#define target_stopped_by_hw_breakpoint()				\
+  ((*current_target.to_stopped_by_hw_breakpoint) (&current_target))
 
 /* Non-zero if we have steppable watchpoints  */
 

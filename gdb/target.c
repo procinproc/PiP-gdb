@@ -726,6 +726,7 @@ update_current_target (void)
       /* Do not inherit to_memory_map.  */
       /* Do not inherit to_flash_erase.  */
       /* Do not inherit to_flash_done.  */
+      INHERIT (to_stopped_by_hw_breakpoint, t);
     }
 #undef INHERIT
 
@@ -968,6 +969,9 @@ update_current_target (void)
 	    (int (*) (void))
 	    return_zero);
   de_fault (to_execution_direction, default_execution_direction);
+  de_fault (to_stopped_by_hw_breakpoint,
+	    (int (*) (struct target_ops *))
+	    return_zero);
 
 #undef de_fault
 

@@ -4295,6 +4295,18 @@ handle_inferior_event (struct execution_control_state *ecs)
 	ecs->event_thread->suspend.stop_signal = GDB_SIGNAL_TRAP;
     }
 
+  /* Maybe this was a trap for a hardware breakpoint/watchpoint that
+     has since been removed.  */
+  if (ecs->random_signal && target_stopped_by_hw_breakpoint())
+    {
+      /* A delayed hardware breakpoint event.  Ignore the trap.  */
+      if (debug_infrun)
+	fprintf_unfiltered (gdb_stdlog,
+			    "infrun: delayed hardware breakpoint/watchpoint "
+			    "trap, ignoring\n");
+      ecs->random_signal = 0;
+    }
+
 process_event_stop_test:
 
   /* Re-fetch current thread's frame in case we did a
