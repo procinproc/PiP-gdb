@@ -237,6 +237,11 @@ extern int run_once;
 extern int multi_process;
 extern int non_stop;
 
+/* True if the "hwbreak+" feature is active.  In that case, GDB wants
+   us to report whether a trap is explained by a hardware breakpoint.
+   Only enabled if the target supports it.  */
+extern int hwbreak_feature;
+
 extern int disable_randomization;
 
 #if USE_WIN32API

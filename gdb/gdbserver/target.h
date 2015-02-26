@@ -250,6 +250,13 @@ struct target_ops
   int (*insert_point) (char type, CORE_ADDR addr, int len);
   int (*remove_point) (char type, CORE_ADDR addr, int len);
 
+  /* Returns 1 if the target stopped for a hardware breakpoint.  */
+  int (*stopped_by_hw_breakpoint) (void);
+
+  /* Returns true if the target knows whether a trap was caused by a
+     HW breakpoint triggering.  */
+  int (*supports_stopped_by_hw_breakpoint) (void);
+
   /* Returns 1 if target was stopped due to a watchpoint hit, 0 otherwise.  */
 
   int (*stopped_by_watchpoint) (void);
@@ -548,6 +555,14 @@ int kill_inferior (int);
 
 #define target_read_btrace(tinfo, buffer, type)	\
   (*the_target->read_btrace) (tinfo, buffer, type)
+
+#define target_supports_stopped_by_hw_breakpoint() \
+  (the_target->supports_stopped_by_hw_breakpoint ? \
+   (*the_target->supports_stopped_by_hw_breakpoint) () : 0)
+
+#define target_stopped_by_hw_breakpoint() \
+  (the_target->stopped_by_hw_breakpoint ? \
+   (*the_target->stopped_by_hw_breakpoint) () : 0)
 
 /* Start non-stop mode, returns 0 on success, -1 on failure.   */
 
