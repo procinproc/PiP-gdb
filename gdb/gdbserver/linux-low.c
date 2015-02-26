@@ -1360,6 +1360,8 @@ find_lwp_pid (ptid_t ptid)
   return (struct lwp_info*) find_inferior (&all_lwps, same_lwp, &ptid);
 }
 
+static void save_stop_reason (struct lwp_info *lwp);
+
 static struct lwp_info *
 linux_wait_for_lwp (ptid_t ptid, int *wstatp, int options)
 {
@@ -1465,6 +1467,10 @@ retry:
 
 	  current_inferior = saved_inferior;
 	}
+
+      /* RHEL */
+      if (!child->stopped_by_watchpoint)
+	save_stop_reason (child);
     }
 
   /* Store the STOP_PC, with adjustment applied.  This depends on the
@@ -1846,6 +1852,47 @@ cancel_breakpoint (struct lwp_info *lwp)
 /* When the event-loop is doing a step-over, this points at the thread
    being stepped.  */
 ptid_t step_over_bkpt;
+
+// gdb/nat/linux-ptrace.h
+#if defined __i386__ || defined __x86_64__
+# define GDB_ARCH_IS_TRAP_BRKPT(X) ((X) == SI_KERNEL)
+# define GDB_ARCH_IS_TRAP_HWBKPT(X) ((X) == TRAP_HWBKPT)
+#elif defined __powerpc__
+# define GDB_ARCH_IS_TRAP_BRKPT(X) ((X) == SI_KERNEL || (X) == TRAP_BRKPT)
+# define GDB_ARCH_IS_TRAP_HWBKPT(X) ((X) == TRAP_HWBKPT)
+#elif defined __mips__
+# define GDB_ARCH_IS_TRAP_BRKPT(X) ((X) == SI_KERNEL)
+# define GDB_ARCH_IS_TRAP_HWBKPT(X) ((X) == SI_KERNEL)
+#else
+# define GDB_ARCH_IS_TRAP_BRKPT(X) ((X) == TRAP_BRKPT)
+# define GDB_ARCH_IS_TRAP_HWBKPT(X) ((X) == TRAP_HWBKPT)
+#endif
+
+// gdb/nat/linux-ptrace.h
+#ifndef TRAP_HWBKPT
+# define TRAP_HWBKPT 4
+#endif
+
+static void
+save_stop_reason (struct lwp_info *lwp)
+{
+  siginfo_t siginfo;
+
+  if (ptrace (PTRACE_GETSIGINFO, lwpid_of (lwp),
+              (PTRACE_ARG3_TYPE) 0, &siginfo) == 0)
+    {
+      if (siginfo.si_signo == SIGTRAP)
+        {
+          if (GDB_ARCH_IS_TRAP_HWBKPT (siginfo.si_code))
+	    {
+              /* This can indicate either a hardware breakpoint or
+                 hardware watchpoint.  Check debug registers.  */
+//              if (!check_stopped_by_watchpoint (lwp))
+		lwp->stopped_by_hw_breakpoint = 1;
+	    }
+	}
+    }
+}
 
 /* Wait for an event from child PID.  If PID is -1, wait for any
    child.  Store the stop status through the status pointer WSTAT.
@@ -3332,6 +3379,7 @@ lwp %ld wants to get out of fast tracepoint jump pad single-stepping\n",
   errno = 0;
   lwp->stopped = 0;
   lwp->stopped_by_watchpoint = 0;
+  lwp->stopped_by_hw_breakpoint = 0;
   lwp->stepping = step;
   ptrace (step ? PTRACE_SINGLESTEP : PTRACE_CONT, lwpid_of (lwp),
 	  (PTRACE_ARG3_TYPE) 0,
@@ -4856,6 +4904,26 @@ linux_remove_point (char type, CORE_ADDR addr, int len)
     return 1;
 }
 
+/* Implement the to_stopped_by_hw_breakpoint target_ops
+   method.  */
+
+static int
+linux_stopped_by_hw_breakpoint (void)
+{
+  struct lwp_info *lwp = get_thread_lwp (current_inferior);
+
+  return lwp->stopped_by_hw_breakpoint;
+}
+
+/* Implement the to_supports_stopped_by_hw_breakpoint target_ops
+   method.  */
+
+static int
+linux_supports_stopped_by_hw_breakpoint (void)
+{
+  return 1; // RHEL
+}
+
 static int
 linux_stopped_by_watchpoint (void)
 {
@@ -5946,6 +6014,8 @@ static struct target_ops linux_target_ops = {
   linux_read_auxv,
   linux_insert_point,
   linux_remove_point,
+  linux_stopped_by_hw_breakpoint,
+  linux_supports_stopped_by_hw_breakpoint,
   linux_stopped_by_watchpoint,
   linux_stopped_data_address,
 #if defined(__UCLIBC__) && defined(HAS_NOMMU)

@@ -223,6 +223,9 @@ struct lwp_info
      watchpoint trap.  */
   int stopped_by_watchpoint;
 
+  /* RHEL: TARGET_STOPPED_BY_HW_BREAKPOINT */
+  int stopped_by_hw_breakpoint;
+
   /* On architectures where it is possible to know the data address of
      a triggered watchpoint, STOPPED_DATA_ADDRESS is non-zero, and
      contains such data address.  Only valid if STOPPED_BY_WATCHPOINT
