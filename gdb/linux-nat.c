@@ -1953,6 +1953,7 @@ linux_resume_one_lwp_throw (struct lwp_info *lp, int step,
      otherwise handle_zombie_lwp_error would get confused.  */
   lp->stopped = 0;
   lp->stopped_by_watchpoint = 0;
+  lp->stopped_by_hw_breakpoint = 0;
   registers_changed_ptid (lp->ptid);
 }
 
@@ -2874,6 +2875,15 @@ save_sigtrap (struct lwp_info *lp)
     }
 
   do_cleanups (old_chain);
+
+  {
+#define __SI_FAULT	0
+#define TRAP_HWBKPT     (__SI_FAULT|4)  /* hardware breakpoint/watchpoint */
+  siginfo_t siginfo;
+  if (linux_nat_get_siginfo (lp->ptid, &siginfo)
+      && siginfo.si_signo == SIGTRAP && siginfo.si_code == TRAP_HWBKPT)
+    lp->stopped_by_hw_breakpoint = 1;
+  }
 }
 
 /* See save_sigtrap.  */
@@ -3160,6 +3170,17 @@ cancel_breakpoints_callback (struct lwp_info *lp, void *data)
     lp->status = 0;
 
   return 0;
+}
+
+static int
+linux_nat_stopped_by_hw_breakpoint (struct target_ops *ops)
+{
+  struct lwp_info *lp = find_lwp_pid (inferior_ptid);
+
+  if (lp == NULL)
+    return 0;
+
+  return lp->stopped_by_hw_breakpoint;
 }
 
 /* Select one LWP out of those that have events pending.  */
@@ -5233,6 +5254,7 @@ linux_nat_add_target (struct target_ops *t)
   t->to_thread_address_space = linux_nat_thread_address_space;
   t->to_stopped_by_watchpoint = linux_nat_stopped_by_watchpoint;
   t->to_stopped_data_address = linux_nat_stopped_data_address;
+  t->to_stopped_by_hw_breakpoint = linux_nat_stopped_by_hw_breakpoint;
 
   t->to_can_async_p = linux_nat_can_async_p;
   t->to_is_async_p = linux_nat_is_async_p;
