@@ -912,13 +912,22 @@ solib_svr4_r_ldsomap (struct svr4_info *info)
   struct link_map_offsets *lmo = svr4_fetch_link_map_offsets ();
   struct type *ptr_type = builtin_type (target_gdbarch ())->builtin_data_ptr;
   enum bfd_endian byte_order = gdbarch_byte_order (target_gdbarch ());
-  ULONGEST version;
+  ULONGEST version = 0;
+  volatile struct gdb_exception ex;
 
-  /* Check version, and return zero if `struct r_debug' doesn't have
-     the r_ldsomap member.  */
-  version
-    = read_memory_unsigned_integer (info->debug_base + lmo->r_version_offset,
-				    lmo->r_version_size, byte_order);
+  TRY_CATCH (ex, RETURN_MASK_ERROR)
+    {
+      /* Check version, and return zero if `struct r_debug' doesn't have
+	 the r_ldsomap member.  */
+      version
+	= read_memory_unsigned_integer (info->debug_base + lmo->r_version_offset,
+					lmo->r_version_size, byte_order);
+    }
+  if (ex.reason < 0)
+    {
+      exception_print (gdb_stderr, ex);
+    }
+
   if (version < 2 || lmo->r_ldsomap_offset == -1)
     return 0;
 
