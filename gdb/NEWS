@@ -18,6 +18,14 @@ add-auto-load-scripts-directory directory
   the program interruption transaction diagnostic block (TDB) is now
   represented as a number of additional "registers" in GDB.
 
+* GDB now honors the content of the file /proc/PID/coredump_filter
+  (PID is the process ID) on GNU/Linux systems.  This file can be used
+  to specify the types of memory mappings that will be included in a
+  corefile.  For more information, please refer to the manual page of
+  "core(5)".  GDB also has a new command: "set use-coredump-filter
+  on|off".  It allows to set whether GDB will read the content of the
+  /proc/PID/coredump_filter file when generating a corefile.
+
 * New remote packets
 
 qXfer:libraries-svr4:read's annex
