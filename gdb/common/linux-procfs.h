@@ -36,6 +36,8 @@ extern pid_t linux_proc_get_tracerpid (pid_t lwpid);
 
 extern int linux_proc_pid_is_stopped (pid_t pid);
 
+extern int linux_proc_pid_is_trace_stopped (pid_t pid);
+
 /* Return non-zero if PID is a zombie.  */
 
 extern int linux_proc_pid_is_zombie (pid_t pid);

@@ -111,6 +111,12 @@ linux_proc_pid_is_stopped (pid_t pid)
   return linux_proc_pid_has_state (pid, "T (stopped)");
 }
 
+int
+linux_proc_pid_is_trace_stopped (pid_t pid)
+{
+  return linux_proc_pid_has_state (pid, "T (tracing stop)");
+}
+
 /* See linux-procfs.h declaration.  */
 
 int

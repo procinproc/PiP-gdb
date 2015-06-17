@@ -1928,6 +1928,85 @@ linux_nat_detach (struct target_ops *ops, char *args, int from_tty)
     linux_ops->to_detach (ops, args, from_tty);
 }
 
+/* Resume execution of the inferior process.  If STEP is nonzero,
+   single-step it.  If SIGNAL is nonzero, give it that signal.  */
+
+static void
+linux_resume_one_lwp_throw (struct lwp_info *lp, int step,
+			    enum gdb_signal signo)
+{
+  ptid_t ptid;
+
+  lp->step = step;
+
+  if (linux_nat_prepare_to_resume != NULL)
+    linux_nat_prepare_to_resume (lp);
+
+  ptid = pid_to_ptid (GET_LWP (lp->ptid));
+  linux_ops->to_resume (linux_ops, ptid, step, signo);
+
+  /* Successfully resumed.  Clear state that no longer makes sense,
+     and mark the LWP as running.  Must not do this before resuming
+     otherwise if that fails other code will be confused.  E.g., we'd
+     later try to stop the LWP and hang forever waiting for a stop
+     status.  Note that we must not throw after this is cleared,
+     otherwise handle_zombie_lwp_error would get confused.  */
+  lp->stopped = 0;
+  lp->stopped_by_watchpoint = 0;
+  registers_changed_ptid (lp->ptid);
+}
+
+/* Called when we try to resume a stopped LWP and that errors out.  If
+   the LWP is no longer in ptrace-stopped state (meaning it's zombie,
+   or about to become), discard the error, clear any pending status
+   the LWP may have, and return true (we'll collect the exit status
+   soon enough).  Otherwise, return false.  */
+
+static int
+check_ptrace_stopped_lwp_gone (struct lwp_info *lp)
+{
+  /* If we get an error after resuming the LWP successfully, we'd
+     confuse !T state for the LWP being gone.  */
+  gdb_assert (lp->stopped);
+
+  /* We can't just check whether the LWP is in 'Z (Zombie)' state,
+     because even if ptrace failed with ESRCH, the tracee may be "not
+     yet fully dead", but already refusing ptrace requests.  In that
+     case the tracee has 'R (Running)' state for a little bit
+     (observed in Linux 3.18).  See also the note on ESRCH in the
+     ptrace(2) man page.  Instead, check whether the LWP has any state
+     other than ptrace-stopped.  */
+
+  /* Don't assume anything if /proc/PID/status can't be read.  */
+  if (linux_proc_pid_is_trace_stopped (ptid_get_lwp (lp->ptid)) == 0)
+    {
+      lp->status = 0;
+      lp->waitstatus.kind = TARGET_WAITKIND_IGNORE;
+      lp->stopped_by_watchpoint = 0;
+      return 1;
+    }
+  return 0;
+}
+
+/* Like linux_resume_one_lwp_throw, but no error is thrown if the LWP
+   disappears while we try to resume it.  */
+
+static void
+linux_resume_one_lwp (struct lwp_info *lp, int step, enum gdb_signal signo)
+{
+  volatile struct gdb_exception ex;
+
+  TRY_CATCH (ex, RETURN_MASK_ERROR)
+    {
+      linux_resume_one_lwp_throw (lp, step, signo);
+    }
+  if (ex.reason < 0)
+    {
+      if (!check_ptrace_stopped_lwp_gone (lp))
+	throw_exception (ex);
+    }
+}
+
 /* Resume LP.  */
 
 static void
@@ -1956,14 +2035,7 @@ resume_lwp (struct lwp_info *lp, int step, enum gdb_signal signo)
 				 : "0"),
 				step ? "step" : "resume");
 
-	  if (linux_nat_prepare_to_resume != NULL)
-	    linux_nat_prepare_to_resume (lp);
-	  linux_ops->to_resume (linux_ops,
-				pid_to_ptid (GET_LWP (lp->ptid)),
-				step, signo);
-	  lp->stopped = 0;
-	  lp->step = step;
-	  lp->stopped_by_watchpoint = 0;
+	  linux_resume_one_lwp (lp, step, signo);
 	}
       else
 	{
@@ -1982,12 +2054,16 @@ resume_lwp (struct lwp_info *lp, int step, enum gdb_signal signo)
     }
 }
 
-/* Resume LWP, with the last stop signal, if it is in pass state.  */
+/* Callback for iterate_over_lwps.  If LWP is EXCEPT, do nothing.
+   Resume LWP with the last stop signal, if it is in pass state.  */
 
 static int
-linux_nat_resume_callback (struct lwp_info *lp, void *data)
+linux_nat_resume_callback (struct lwp_info *lp, void *except)
 {
   enum gdb_signal signo = GDB_SIGNAL_0;
+
+  if (lp == except)
+    return 0;
 
   if (lp->stopped)
     {
@@ -2108,20 +2184,10 @@ linux_nat_resume (struct target_ops *ops,
       return;
     }
 
-  /* Mark LWP as not stopped to prevent it from being continued by
-     linux_nat_resume_callback.  */
-  lp->stopped = 0;
-
   if (resume_many)
-    iterate_over_lwps (ptid, linux_nat_resume_callback, NULL);
+    iterate_over_lwps (ptid, linux_nat_resume_callback, lp);
 
-  /* Convert to something the lower layer understands.  */
-  ptid = pid_to_ptid (GET_LWP (lp->ptid));
-
-  if (linux_nat_prepare_to_resume != NULL)
-    linux_nat_prepare_to_resume (lp);
-  linux_ops->to_resume (linux_ops, ptid, step, signo);
-  lp->stopped_by_watchpoint = 0;
+  linux_resume_one_lwp (lp, step, signo);
 
   if (debug_linux_nat)
     fprintf_unfiltered (gdb_stdlog,
@@ -2287,11 +2353,7 @@ linux_handle_syscall_trap (struct lwp_info *lp, int stopping)
 
   /* Note that gdbarch_get_syscall_number may access registers, hence
      fill a regcache.  */
-  registers_changed ();
-  if (linux_nat_prepare_to_resume != NULL)
-    linux_nat_prepare_to_resume (lp);
-  linux_ops->to_resume (linux_ops, pid_to_ptid (GET_LWP (lp->ptid)),
-			lp->step, GDB_SIGNAL_0);
+  linux_resume_one_lwp (lp, lp->step, GDB_SIGNAL_0);
   return 1;
 }
 
@@ -2486,22 +2548,15 @@ linux_handle_extended_wait (struct lwp_info *lp, int status,
 		    fprintf_unfiltered (gdb_stdlog,
 					"LHEW: resuming new LWP %ld\n",
 					GET_LWP (new_lp->ptid));
-		  if (linux_nat_prepare_to_resume != NULL)
-		    linux_nat_prepare_to_resume (new_lp);
-		  linux_ops->to_resume (linux_ops, pid_to_ptid (new_pid),
-					0, GDB_SIGNAL_0);
-		  new_lp->stopped = 0;
+
+		  linux_resume_one_lwp (new_lp, 0, GDB_SIGNAL_0);
 		}
 	    }
 
 	  if (debug_linux_nat)
 	    fprintf_unfiltered (gdb_stdlog,
 				"LHEW: resuming parent LWP %d\n", pid);
-	  if (linux_nat_prepare_to_resume != NULL)
-	    linux_nat_prepare_to_resume (lp);
-	  linux_ops->to_resume (linux_ops, pid_to_ptid (GET_LWP (lp->ptid)),
-				0, GDB_SIGNAL_0);
-
+	  linux_resume_one_lwp (lp, 0, GDB_SIGNAL_0);
 	  return 1;
 	}
 
@@ -3382,12 +3437,7 @@ linux_nat_filter_event (int lwpid, int status, int *new_pending_p)
 	{
 	  /* This is a delayed SIGSTOP.  */
 
-	  registers_changed ();
-
-	  if (linux_nat_prepare_to_resume != NULL)
-	    linux_nat_prepare_to_resume (lp);
-	  linux_ops->to_resume (linux_ops, pid_to_ptid (GET_LWP (lp->ptid)),
-			    lp->step, GDB_SIGNAL_0);
+	  linux_resume_one_lwp (lp, lp->step, GDB_SIGNAL_0);
 	  if (debug_linux_nat)
 	    fprintf_unfiltered (gdb_stdlog,
 				"LLW: %s %s, 0, 0 (discard SIGSTOP)\n",
@@ -3395,7 +3445,6 @@ linux_nat_filter_event (int lwpid, int status, int *new_pending_p)
 				"PTRACE_SINGLESTEP" : "PTRACE_CONT",
 				target_pid_to_str (lp->ptid));
 
-	  lp->stopped = 0;
 	  gdb_assert (lp->resumed);
 
 	  /* Discard the event.  */
@@ -3416,11 +3465,7 @@ linux_nat_filter_event (int lwpid, int status, int *new_pending_p)
       /* This is a delayed SIGINT.  */
       lp->ignore_sigint = 0;
 
-      registers_changed ();
-      if (linux_nat_prepare_to_resume != NULL)
-	linux_nat_prepare_to_resume (lp);
-      linux_ops->to_resume (linux_ops, pid_to_ptid (GET_LWP (lp->ptid)),
-			    lp->step, GDB_SIGNAL_0);
+      linux_resume_one_lwp (lp, lp->step, GDB_SIGNAL_0);
       if (debug_linux_nat)
 	fprintf_unfiltered (gdb_stdlog,
 			    "LLW: %s %s, 0, 0 (discard SIGINT)\n",
@@ -3428,7 +3473,6 @@ linux_nat_filter_event (int lwpid, int status, int *new_pending_p)
 			    "PTRACE_SINGLESTEP" : "PTRACE_CONT",
 			    target_pid_to_str (lp->ptid));
 
-      lp->stopped = 0;
       gdb_assert (lp->resumed);
 
       /* Discard the event.  */
@@ -3796,11 +3840,7 @@ retry:
 	     other threads to run.  On the other hand, not resuming
 	     newly attached threads may cause an unwanted delay in
 	     getting them running.  */
-	  registers_changed ();
-	  if (linux_nat_prepare_to_resume != NULL)
-	    linux_nat_prepare_to_resume (lp);
-	  linux_ops->to_resume (linux_ops, pid_to_ptid (GET_LWP (lp->ptid)),
-				lp->step, signo);
+	  linux_resume_one_lwp (lp, lp->step, signo);
 	  if (debug_linux_nat)
 	    fprintf_unfiltered (gdb_stdlog,
 				"LLW: %s %s, %s (preempt 'handle')\n",
@@ -3810,7 +3850,6 @@ retry:
 				(signo != GDB_SIGNAL_0
 				 ? strsignal (gdb_signal_to_host (signo))
 				 : "0"));
-	  lp->stopped = 0;
 	  goto retry;
 	}
 
@@ -3935,32 +3974,41 @@ resume_stopped_resumed_lwps (struct lwp_info *lp, void *data)
     {
       struct regcache *regcache = get_thread_regcache (lp->ptid);
       struct gdbarch *gdbarch = get_regcache_arch (regcache);
-      CORE_ADDR pc = regcache_read_pc (regcache);
+      volatile struct gdb_exception ex;
 
       gdb_assert (is_executing (lp->ptid));
 
-      /* Don't bother if there's a breakpoint at PC that we'd hit
-	 immediately, and we're not waiting for this LWP.  */
-      if (!ptid_match (lp->ptid, *wait_ptid_p))
+      TRY_CATCH (ex, RETURN_MASK_ERROR)
 	{
-	  if (breakpoint_inserted_here_p (get_regcache_aspace (regcache), pc))
-	    return 0;
+	  CORE_ADDR pc = regcache_read_pc (regcache);
+	  int leave_stopped = 0;
+
+	  /* Don't bother if there's a breakpoint at PC that we'd hit
+	     immediately, and we're not waiting for this LWP.  */
+	  if (!ptid_match (lp->ptid, *wait_ptid_p))
+	    {
+	      if (breakpoint_inserted_here_p (get_regcache_aspace (regcache), pc))
+		leave_stopped = 1;
+	    }
+
+	  if (!leave_stopped)
+	    {
+	      if (debug_linux_nat)
+		fprintf_unfiltered (gdb_stdlog,
+				    "RSRL: resuming stopped-resumed LWP %s at "
+				    "%s: step=%d\n",
+				    target_pid_to_str (lp->ptid),
+				    paddress (gdbarch, pc),
+				    lp->step);
+
+	      linux_resume_one_lwp_throw (lp, lp->step, GDB_SIGNAL_0);
+	    }
 	}
-
-      if (debug_linux_nat)
-	fprintf_unfiltered (gdb_stdlog,
-			    "RSRL: resuming stopped-resumed LWP %s at %s: step=%d\n",
-			    target_pid_to_str (lp->ptid),
-			    paddress (gdbarch, pc),
-			    lp->step);
-
-      registers_changed ();
-      if (linux_nat_prepare_to_resume != NULL)
-	linux_nat_prepare_to_resume (lp);
-      linux_ops->to_resume (linux_ops, pid_to_ptid (GET_LWP (lp->ptid)),
-			    lp->step, GDB_SIGNAL_0);
-      lp->stopped = 0;
-      lp->stopped_by_watchpoint = 0;
+      if (ex.reason < 0)
+	{
+	  if (!check_ptrace_stopped_lwp_gone (lp))
+	    throw_exception (ex);
+	}
     }
 
   return 0;

@@ -1,0 +1,70 @@
+# Copyright (C) 2015 Free Software Foundation, Inc.
+
+# This program is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation; either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+standard_testfile
+
+if {[gdb_compile_pthreads "${srcdir}/${subdir}/${srcfile}" "${binfile}" executable {debug}] != "" } {
+    return -1
+}
+
+clean_restart ${binfile}
+if {![runto_main]} {
+    fail "Couldn't run to main"
+    return
+}
+
+gdb_breakpoint "all_threads_started"
+
+gdb_continue_to_breakpoint "all_threads_started"
+
+# Update the thread list, otherwise when testing against GDBserver,
+# GDB won't know about thread 2.  (Only necessary with GDB < 7.9.)
+gdb_test "info threads" ".*"
+
+# Select any thread but the leader.
+gdb_test "thread 2" ".*" "switch to non-leader thread"
+
+# Delete breakpoints so that GDB doesn't switch back the to leader to
+# step over its breakpoint.
+delete_breakpoints
+
+# Let threads exit the process on next resume.
+gdb_test "p call_exit = 0" " = 0"
+
+# While GDB is busy resuming all threads one by one, one of the
+# threads should manage to exit the process.  GDB should handle that
+# gracefully instead of erroring out.
+#
+# gdb_continue_to_end doesn't work with GDBserver until the
+# introduction of the "exit_is_reliable" board variable
+# (b477a5e649150) in GDB 7.7.
+#gdb_continue_to_end "" continue 1
+gdb_test "continue" "$inferior_exited_re normally.*"
+
+# On the buggy GDB where the "continue" above would error out, a
+# subsequent "detach" (e.g., the user tries to quit GDB, and quit
+# offers to detach) would hit this assertion:
+#
+#   linux-nat.c:1869: internal-error: linux_nat_detach: Assertion `num_lwps (GET_PID (inferior_ptid)) == 1' failed.
+
+# That was a consequence of the original bug, but let's make sure that
+# even when "continue" is handled properly, detach doesn't stumble on
+# anything stale.
+gdb_test "detach" "The program is not being run\\." \
+    "detach after exit"
+
+# Likewise "continue".
+gdb_test "continue" "The program is not being run\\." \
+    "continue after exit"
