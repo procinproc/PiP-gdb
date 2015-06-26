@@ -3386,7 +3386,9 @@ collect_symbols (struct symbol *sym, void *data)
 }
 
 /* We've found a minimal symbol MSYMBOL in OBJFILE to associate with our
-   linespec; return the SAL in RESULT.  */
+   linespec; return the SAL in RESULT.  This function should return SALs
+   matching those from find_function_start_sal, otherwise false
+   multiple-locations breakpoints could be placed.  */
 
 static void
 minsym_found (struct linespec_state *self, struct objfile *objfile,
@@ -3408,7 +3410,23 @@ minsym_found (struct linespec_state *self, struct objfile *objfile,
     sal = find_pc_sect_line (pc, NULL, 0);
 
   if (self->funfirstline)
-    skip_prologue_sal (&sal);
+    {
+      if (sal.symtab != NULL
+	  && (sal.symtab->locations_valid
+	      || sal.symtab->language == language_asm))
+	{
+	  /* If gdbarch_convert_from_func_ptr_addr does not apply then
+	     sal.SECTION, sal.LINE&co. will stay correct from above.
+	     If gdbarch_convert_from_func_ptr_addr applies then
+	     sal.SECTION is cleared from above and sal.LINE&co. will
+	     stay correct from the last find_pc_sect_line above.  */
+	  sal.pc = SYMBOL_VALUE_ADDRESS (msymbol);
+	  sal.pc = gdbarch_convert_from_func_ptr_addr (gdbarch, sal.pc,
+						       &current_target);
+	}
+      else
+	skip_prologue_sal (&sal);
+    }
 
   if (maybe_add_address (self->addr_set, objfile->pspace, sal.pc))
     add_sal_to_sals (self, result, &sal, SYMBOL_NATURAL_NAME (msymbol), 0);
