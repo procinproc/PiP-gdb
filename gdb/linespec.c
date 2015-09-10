@@ -3423,6 +3423,8 @@ minsym_found (struct linespec_state *self, struct objfile *objfile,
 	  sal.pc = SYMBOL_VALUE_ADDRESS (msymbol);
 	  sal.pc = gdbarch_convert_from_func_ptr_addr (gdbarch, sal.pc,
 						       &current_target);
+	  if (gdbarch_skip_entrypoint_p (gdbarch))
+	    sal.pc = gdbarch_skip_entrypoint (gdbarch, sal.pc);
 	}
       else
 	skip_prologue_sal (&sal);

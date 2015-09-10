@@ -2779,7 +2779,11 @@ find_function_start_sal (struct symbol *sym, int funfirstline)
       && (sal.symtab->locations_valid
 	  || sal.symtab->language == language_asm))
     {
+      struct gdbarch *gdbarch = get_objfile_arch (SYMBOL_SYMTAB (sym)->objfile);
+
       sal.pc = BLOCK_START (SYMBOL_BLOCK_VALUE (sym));
+      if (gdbarch_skip_entrypoint_p (gdbarch))
+	sal.pc = gdbarch_skip_entrypoint (gdbarch, sal.pc);
       return sal;
     }
 
