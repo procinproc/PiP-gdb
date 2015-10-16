@@ -1,0 +1,39 @@
+# Copyright (C) 2015 Free Software Foundation, Inc.
+#
+# This program is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation; either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+set testfile attach-kills
+set binfile ${objdir}/${subdir}/${testfile}
+
+if { [build_executable ${testfile}.exp $testfile] == -1 } {
+    return -1
+}
+
+# Start the program running and then wait for a bit, to be sure
+# that it can be attached to.
+
+set testpid [eval exec $binfile &]
+exec sleep 2
+
+remote_exec target "cp -pf -- $binfile $binfile-copy"
+remote_exec target "rm -f -- $binfile"
+
+set GDBFLAGS_orig $GDBFLAGS
+set GDBFLAGS "$GDBFLAGS /DoEsNoTeXySt $testpid"
+gdb_start
+set GDBFLAGS $GDBFLAGS_orig
+
+gdb_test "info inferiors" " process \[0-9\].*"
+
+remote_exec build "kill -9 ${testpid}"
