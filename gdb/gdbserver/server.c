@@ -1884,6 +1884,11 @@ handle_query (char *own_buf, int packet_len, int *new_packet_len_p)
       if (the_target->pid_to_exec_file != NULL)
 	strcat (own_buf, ";qXfer:exec-file:read+");
 
+      /* Reinitialize components as needed for the new connection.  */
+{
+extern void hostio_handle_new_gdb_connection (void);
+      hostio_handle_new_gdb_connection ();
+}
       return;
     }
 
