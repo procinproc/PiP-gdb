@@ -1265,7 +1265,8 @@ check_pid_namespace_match (void)
 	{
 	  warning (_ ("Target and debugger are in different PID "
 		      "namespaces; thread lists and other data are "
-		      "likely unreliable"));
+		      "likely unreliable.  "
+		      "Connect to gdbserver inside the container."));
 	}
 
       xfree (our_pid_ns);
