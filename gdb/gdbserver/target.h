@@ -421,6 +421,13 @@ struct target_ops
      to break a cyclic dependency.  */
   void (*read_btrace) (struct btrace_target_info *, struct buffer *, int type);
 
+  /* Return the full absolute name of the executable file that was
+     run to create the process PID.  If the executable file cannot
+     be determined, NULL is returned.  Otherwise, a pointer to a
+     character string containing the pathname is returned.  This
+     string should be copied into a buffer by the client if the string
+     will not be immediately used, or if it must persist.  */
+  char *(*pid_to_exec_file) (int pid);
 };
 
 extern struct target_ops *the_target;

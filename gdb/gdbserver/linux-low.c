@@ -5993,6 +5993,24 @@ linux_low_read_btrace (struct btrace_target_info *tinfo, struct buffer *buffer,
 }
 #endif /* HAVE_LINUX_BTRACE */
 
+// gdb/nat/linux-procfs.c
+static char *
+linux_proc_pid_to_exec_file (int pid)
+{
+  static char buf[PATH_MAX];
+  char name[PATH_MAX];
+  ssize_t len;
+
+  xsnprintf (name, PATH_MAX, "/proc/%d/exe", pid);
+  len = readlink (name, buf, PATH_MAX - 1);
+  if (len <= 0)
+    strcpy (buf, name);
+  else
+    buf[len] = '\0';
+
+  return buf;
+}
+
 static struct target_ops linux_target_ops = {
   linux_create_inferior,
   linux_attach,
@@ -6070,6 +6088,7 @@ static struct target_ops linux_target_ops = {
   NULL,
   NULL,
 #endif
+  linux_proc_pid_to_exec_file,
 };
 
 static void
