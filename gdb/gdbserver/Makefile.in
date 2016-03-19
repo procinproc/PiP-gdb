@@ -155,7 +155,8 @@ SFILES=	$(srcdir)/gdbreplay.c $(srcdir)/inferiors.c $(srcdir)/dll.c \
 	$(srcdir)/common/vec.c $(srcdir)/common/gdb_vecs.c \
 	$(srcdir)/common/common-utils.c $(srcdir)/common/xml-utils.c \
 	$(srcdir)/common/linux-osdata.c $(srcdir)/common/ptid.c \
-	$(srcdir)/common/buffer.c $(srcdir)/common/linux-btrace.c
+	$(srcdir)/common/buffer.c $(srcdir)/common/linux-btrace.c \
+	$(srcdir)/nat/linux-namespaces.c
 
 DEPFILES = @GDBSERVER_DEPFILES@
 
@@ -567,6 +568,9 @@ i386_low_h = $(srcdir)/i386-low.h
 
 linux-low.o: linux-low.c
 	$(COMPILE) $< @USE_THREAD_DB@
+	$(POSTCOMPILE)
+linux-namespaces.o: ../nat/linux-namespaces.c
+	$(COMPILE) $<
 	$(POSTCOMPILE)
 
 win32_low_h = $(srcdir)/win32-low.h

@@ -840,7 +840,8 @@ gnulib/import/stddef.in.h gnulib/import/inttypes.in.h inline-frame.h skip.h \
 common/common-utils.h common/xml-utils.h common/buffer.h common/ptid.h \
 common/format.h common/host-defs.h utils.h common/queue.h common/gdb_string.h \
 common/linux-osdata.h gdb-dlfcn.h auto-load.h probe.h stap-probe.h \
-gdb_bfd.h sparc-ravenscar-thread.h ppc-ravenscar-thread.h common/linux-btrace.h
+gdb_bfd.h sparc-ravenscar-thread.h ppc-ravenscar-thread.h common/linux-btrace.h \
+nat/linux-namespaces.h
 
 # Header files that already have srcdir in them, or which are in objdir.
 
@@ -2035,6 +2036,10 @@ vec.o: ${srcdir}/common/vec.c
 
 linux-btrace.o: ${srcdir}/common/linux-btrace.c
 	$(COMPILE) $(srcdir)/common/linux-btrace.c
+	$(POSTCOMPILE)
+
+linux-namespaces.o: ${srcdir}/nat/linux-namespaces.c
+	$(COMPILE) $(srcdir)/nat/linux-namespaces.c
 	$(POSTCOMPILE)
 
 #
