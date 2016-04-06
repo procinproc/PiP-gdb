@@ -2426,7 +2426,12 @@ attach_command_post_wait (char *args, int from_tty, int async_exec)
   if (!exec_file)
     {
       exec_file = target_pid_to_exec_file (PIDGET (inferior_ptid));
-      if (exec_file)
+      if (!exec_file)
+	warning (_("No executable has been specified and target does not "
+		   "support\n"
+		   "determining executable automatically.  "
+		   "Try using the \"file\" command."));
+      else
 	{
 	  /* It's possible we don't have a full path, but rather just a
 	     filename.  Some targets, such as HP-UX, don't provide the
