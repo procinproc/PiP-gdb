@@ -29,6 +29,7 @@
 #endif
 #include "gdb_wait.h"
 #include "btrace-common.h"
+#include "linux-low.h"
 
 /* The thread set with an `Hc' packet.  `Hc' is deprecated in favor of
    `vCont'.  Note the multi-process extensions made `vCont' a
@@ -1013,17 +1014,32 @@ handle_qxfer_exec_file (const char *const_annex,
 			gdb_byte *readbuf, const gdb_byte *writebuf,
 			ULONGEST offset, LONGEST len)
 {
-  char *annex, *file;
+  char *file;
   ULONGEST pid;
   int total_len;
 
   if (the_target->pid_to_exec_file == NULL || writebuf != NULL)
     return -2;
 
-  annex = alloca (strlen (const_annex) + 1);
-  strcpy (annex, const_annex);
-  annex = unpack_varlen_hex (annex, &pid);
-  if (annex[0] != '\0' || pid == 0)
+  if (const_annex[0] == '\0')
+    {
+      if (current_inferior == NULL)
+	return -1;
+
+      pid = ptid_get_pid (current_inferior->entry.id);
+    }
+  else
+    {
+      char *annex = alloca (strlen (const_annex) + 1);
+
+      strcpy (annex, const_annex);
+      annex = unpack_varlen_hex (annex, &pid);
+
+      if (annex[0] != '\0')
+	return -1;
+    }
+
+  if (pid <= 0)
     return -1;
 
   file = (*the_target->pid_to_exec_file) (pid);
