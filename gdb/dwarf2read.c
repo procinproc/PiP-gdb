@@ -1486,12 +1486,15 @@ static int dwarf2_ranges_read (unsigned, CORE_ADDR *, CORE_ADDR *,
 			       struct dwarf2_cu *, struct partial_symtab *);
 
 /* How dwarf2_get_pc_bounds constructed its *LOWPC and *HIGHPC return
-   values.  */
+   values.  Keep the items ordered with increasing constraints compliance.  */
 enum pc_bounds_kind
 {
-  /* No valid combination of DW_AT_low_pc, DW_AT_high_pc or DW_AT_ranges
-     was found.  */
+  /* No attribute DW_AT_low_pc, DW_AT_high_pc or DW_AT_ranges was found.  */
   PC_BOUNDS_NOT_PRESENT,
+
+  /* Some of the attributes DW_AT_low_pc, DW_AT_high_pc or DW_AT_ranges
+     were present but they do not form a valid range of PC addresses.  */
+  PC_BOUNDS_INVALID,
 
   /* Discontiguous range was found - that is DW_AT_ranges was found.  */
   PC_BOUNDS_RANGES,
@@ -5027,7 +5030,7 @@ process_psymtab_comp_unit_reader (const struct die_reader_specs *reader,
       first_die = load_partial_dies (reader, info_ptr, 1);
 
       scan_partial_symbols (first_die, &lowpc, &highpc,
-			    cu_bounds_kind == PC_BOUNDS_NOT_PRESENT, cu);
+			    cu_bounds_kind <= PC_BOUNDS_INVALID, cu);
 
       /* If we didn't find a lowpc, set it to highpc to avoid
 	 complaints from `maint check'.	 */
@@ -5036,7 +5039,7 @@ process_psymtab_comp_unit_reader (const struct die_reader_specs *reader,
 
       /* If the compilation unit didn't have an explicit address range,
 	 then use the information extracted from its child dies.  */
-      if (cu_bounds_kind == PC_BOUNDS_NOT_PRESENT)
+      if (cu_bounds_kind <= PC_BOUNDS_INVALID)
 	{
 	  best_lowpc = lowpc;
 	  best_highpc = highpc;
@@ -9606,7 +9609,7 @@ read_func_scope (struct die_info *die, struct dwarf2_cu *cu)
 
   /* Ignore functions with missing or invalid low and high pc attributes.  */
   if (dwarf2_get_pc_bounds (die, &lowpc, &highpc, cu, NULL)
-      == PC_BOUNDS_NOT_PRESENT)
+      <= PC_BOUNDS_INVALID)
     {
       attr = dwarf2_attr (die, DW_AT_external, cu);
       if (!attr || !DW_UNSND (attr))
@@ -9763,9 +9766,20 @@ read_lexical_block_scope (struct die_info *die, struct dwarf2_cu *cu)
      as multiple lexical blocks?  Handling children in a sane way would
      be nasty.  Might be easier to properly extend generic blocks to
      describe ranges.  */
-  if (dwarf2_get_pc_bounds (die, &lowpc, &highpc, cu, NULL)
-      == PC_BOUNDS_NOT_PRESENT)
-    return;
+  switch (dwarf2_get_pc_bounds (die, &lowpc, &highpc, cu, NULL))
+    {
+    case PC_BOUNDS_NOT_PRESENT:
+      /* DW_TAG_lexical_block has no attributes, process its children as if
+	 there was no wrapping by that DW_TAG_lexical_block.
+	 GCC does no longer produces such DWARF since GCC r224161.  */
+      for (child_die = die->child;
+	   child_die != NULL && child_die->tag;
+	   child_die = sibling_die (child_die))
+	process_die (child_die, cu);
+      return;
+    case PC_BOUNDS_INVALID:
+      return;
+    }
   lowpc += baseaddr;
   highpc += baseaddr;
 
@@ -9970,7 +9984,7 @@ read_call_site_scope (struct die_info *die, struct dwarf2_cu *cu)
 
 	  /* DW_AT_entry_pc should be preferred.  */
 	  if (dwarf2_get_pc_bounds (target_die, &lowpc, NULL, target_cu, NULL)
-	      == PC_BOUNDS_NOT_PRESENT)
+	      <= PC_BOUNDS_INVALID)
 	    complaint (&symfile_complaints,
 		       _("DW_AT_GNU_call_site_target target DIE has invalid "
 		         "low pc, for referencing DIE 0x%x [in module %s]"),
@@ -10249,7 +10263,7 @@ dwarf2_ranges_read (unsigned offset, CORE_ADDR *low_return,
 
 /* Get low and high pc attributes from a die.  See enum pc_bounds_kind
    definition for the return value.  *LOWPC and *HIGHPC are set iff
-   PC_BOUNDS_NOT_PRESENT is not returned.  */
+   neither PC_BOUNDS_NOT_PRESENT nor PC_BOUNDS_INVALID are returned.  */
 
 static enum pc_bounds_kind
 dwarf2_get_pc_bounds (struct die_info *die, CORE_ADDR *lowpc,
@@ -10260,7 +10274,7 @@ dwarf2_get_pc_bounds (struct die_info *die, CORE_ADDR *lowpc,
   struct attribute *attr_high;
   CORE_ADDR low = 0;
   CORE_ADDR high = 0;
-  enum pc_bounds_kind ret = PC_BOUNDS_NOT_PRESENT;
+  enum pc_bounds_kind ret;
 
   attr_high = dwarf2_attr (die, DW_AT_high_pc, cu);
   if (attr_high)
@@ -10277,7 +10291,7 @@ dwarf2_get_pc_bounds (struct die_info *die, CORE_ADDR *lowpc,
 	}
       else
 	/* Found high w/o low attribute.  */
-	return PC_BOUNDS_NOT_PRESENT;
+	return PC_BOUNDS_INVALID;
 
       /* Found consecutive range of addresses.  */
       ret = PC_BOUNDS_HIGH_LOW;
@@ -10299,15 +10313,17 @@ dwarf2_get_pc_bounds (struct die_info *die, CORE_ADDR *lowpc,
 	  /* Value of the DW_AT_ranges attribute is the offset in the
 	     .debug_ranges section.  */
 	  if (!dwarf2_ranges_read (ranges_offset, &low, &high, cu, pst))
-	    return PC_BOUNDS_NOT_PRESENT;
+	    return PC_BOUNDS_INVALID;
 	  /* Found discontinuous range of addresses.  */
 	  ret = PC_BOUNDS_RANGES;
 	}
+      else
+	return PC_BOUNDS_NOT_PRESENT;
     }
 
   /* read_partial_die has also the strict LOW < HIGH requirement.  */
   if (high <= low)
-    return PC_BOUNDS_NOT_PRESENT;
+    return PC_BOUNDS_INVALID;
 
   /* When using the GNU linker, .gnu.linkonce. sections are used to
      eliminate duplicate copies of functions and vtables and such.
@@ -10318,7 +10334,7 @@ dwarf2_get_pc_bounds (struct die_info *die, CORE_ADDR *lowpc,
      If this is a discarded function, mark the pc bounds as invalid,
      so that GDB will ignore it.  */
   if (low == 0 && !dwarf2_per_objfile->has_section_at_zero)
-    return PC_BOUNDS_NOT_PRESENT;
+    return PC_BOUNDS_INVALID;
 
   *lowpc = low;
   if (highpc)
@@ -10339,8 +10355,7 @@ dwarf2_get_subprogram_pc_bounds (struct die_info *die,
   CORE_ADDR low, high;
   struct die_info *child = die->child;
 
-  if (dwarf2_get_pc_bounds (die, &low, &high, cu, NULL)
-      != PC_BOUNDS_NOT_PRESENT)
+  if (dwarf2_get_pc_bounds (die, &low, &high, cu, NULL) >= PC_BOUNDS_RANGES)
     {
       *lowpc = min (*lowpc, low);
       *highpc = max (*highpc, high);
@@ -10378,7 +10393,7 @@ get_scope_pc_bounds (struct die_info *die,
   CORE_ADDR current_low, current_high;
 
   if (dwarf2_get_pc_bounds (die, &current_low, &current_high, cu, NULL)
-      != PC_BOUNDS_NOT_PRESENT)
+      >= PC_BOUNDS_RANGES)
     {
       best_low = current_low;
       best_high = current_high;
