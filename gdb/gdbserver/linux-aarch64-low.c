@@ -1187,6 +1187,8 @@ aarch64_linux_prepare_to_resume (struct lwp_info *lwp)
 #define AARCH64_DEBUG_NUM_SLOTS(x) ((x) & 0xff)
 #define AARCH64_DEBUG_ARCH(x) (((x) >> 8) & 0xff)
 #define AARCH64_DEBUG_ARCH_V8 0x6
+#define AARCH64_DEBUG_ARCH_V8_1 0x7
+#define AARCH64_DEBUG_ARCH_V8_2 0x8
 
 static void
 aarch64_arch_setup (void)
@@ -1203,7 +1205,9 @@ aarch64_arch_setup (void)
 
   /* Get hardware watchpoint register info.  */
   if (ptrace (PTRACE_GETREGSET, pid, NT_ARM_HW_WATCH, &iov) == 0
-      && AARCH64_DEBUG_ARCH (dreg_state.dbg_info) == AARCH64_DEBUG_ARCH_V8)
+      && (AARCH64_DEBUG_ARCH (dreg_state.dbg_info) == AARCH64_DEBUG_ARCH_V8
+	  || AARCH64_DEBUG_ARCH (dreg_state.dbg_info) == AARCH64_DEBUG_ARCH_V8_1
+	  || AARCH64_DEBUG_ARCH (dreg_state.dbg_info) == AARCH64_DEBUG_ARCH_V8_2))
     {
       aarch64_num_wp_regs = AARCH64_DEBUG_NUM_SLOTS (dreg_state.dbg_info);
       if (aarch64_num_wp_regs > AARCH64_HWP_MAX_NUM)
@@ -1223,7 +1227,9 @@ aarch64_arch_setup (void)
 
   /* Get hardware breakpoint register info.  */
   if (ptrace (PTRACE_GETREGSET, pid, NT_ARM_HW_BREAK, &iov) == 0
-      && AARCH64_DEBUG_ARCH (dreg_state.dbg_info) == AARCH64_DEBUG_ARCH_V8)
+      && (AARCH64_DEBUG_ARCH (dreg_state.dbg_info) == AARCH64_DEBUG_ARCH_V8
+	  || AARCH64_DEBUG_ARCH (dreg_state.dbg_info) == AARCH64_DEBUG_ARCH_V8_1
+	  || AARCH64_DEBUG_ARCH (dreg_state.dbg_info) == AARCH64_DEBUG_ARCH_V8_2))
     {
       aarch64_num_bp_regs = AARCH64_DEBUG_NUM_SLOTS (dreg_state.dbg_info);
       if (aarch64_num_bp_regs > AARCH64_HBP_MAX_NUM)
