@@ -59,3 +59,16 @@ stamp-*
 /mpc*
 /gmp*
 /isl*
+
+# Add for PIP-gdb
+Makefile
+Makefile.in
+gdb/build-gnulib/
+gdb/data-directory/python/
+gdb/data-directory/syscalls/
+gdb/gcore
+gdb/gdb-gdb.gdb
+gdb/gdbserver/build-gnulib-gdbserver/
+gdb/gdbserver/x32-avx-linux.c
+gdb/gdbserver/x32-linux.c
+gdb/nm.h
