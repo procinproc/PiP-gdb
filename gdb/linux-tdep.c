@@ -38,6 +38,13 @@
 
 #include <ctype.h>
 
+#ifdef ENABLE_PIP
+#include "symfile.h"
+#include "objfiles.h"
+#include "solib-svr4.h"
+#include "cli/cli-decode.h"
+#endif
+
 /* This enum represents the values that the user can choose when
    informing the Linux kernel about which memory mappings will be
    dumped in a corefile.  They are described in the file
@@ -1922,3 +1929,90 @@ about this file, refer to the manpage of core(5)."),
 			   NULL, show_use_coredump_filter,
 			   &setlist, &showlist);
 }
+
+#ifdef ENABLE_PIP
+int get_process_name (pid_t pid, char *dest_name, size_t size)
+{
+  char filename[100];
+  char *data;
+  char *line;
+  struct cleanup *cleanup;
+
+  xsnprintf (filename, sizeof filename, "/proc/%ld/maps", (long int)pid);
+  data = target_fileio_read_stralloc (filename);
+  if (!data)
+    {
+      warning (_("unable to open /proc file '%s'"), filename);
+      return -1;
+    }
+
+  cleanup = make_cleanup (xfree, data);
+
+  for (line = strtok (data, "\n"); line; line = strtok (NULL, "\n"))
+    {
+      ULONGEST addr, endaddr, offset, inode;
+      const char *permissions, *device, *filename;
+      size_t permissions_len, device_len;
+
+      read_mapping (line, &addr, &endaddr,
+    		&permissions, &permissions_len,
+    		&offset, &device, &device_len,
+    		&inode, &filename);
+
+      if (strncmp (permissions, "r-x", 3) == 0
+              && strlen(filename) != 0
+              && strcmp(filename, "[vdso]") != 0
+              && strcmp(filename, "[vsyscall]") != 0
+              && svr4_check_link_map (pid, filename, addr))
+        {
+          xsnprintf (dest_name, size, "%s", filename);
+          do_cleanups (cleanup);
+          return 0;
+        }
+    }
+
+  do_cleanups (cleanup);
+  return 1;
+}
+
+int found_pc_in_symbol (pid_t pid, ULONGEST addr)
+{
+  char filename[100];
+  char *data;
+  char *line;
+  struct cleanup *cleanup;
+
+  xsnprintf (filename, sizeof filename, "/proc/%ld/maps", (long int)pid);
+  data = target_fileio_read_stralloc (filename);
+  if (!data)
+    {
+      warning (_("unable to open /proc file '%s'"), filename);
+      return 0;
+    }
+
+  cleanup = make_cleanup (xfree, data);
+
+  for (line = strtok (data, "\n"); line; line = strtok (NULL, "\n"))
+    {
+      ULONGEST startaddr, endaddr, offset, inode;
+      const char *permissions, *device, *filename;
+      size_t permissions_len, device_len;
+
+      read_mapping (line, &startaddr, &endaddr,
+    		&permissions, &permissions_len,
+    		&offset, &device, &device_len,
+    		&inode, &filename);
+
+      if (strncmp (permissions, "r-x", 3) == 0 && addr == startaddr
+              && startaddr <= stop_pc && stop_pc <= endaddr)
+        {
+          do_cleanups (cleanup);
+          return 1;
+        }
+    }
+
+  do_cleanups (cleanup);
+
+  return 0;
+}
+#endif

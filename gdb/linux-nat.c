@@ -4437,6 +4437,11 @@ linux_child_pid_to_exec_file (int pid)
   make_cleanup (xfree, name2);
   memset (name2, 0, MAXPATHLEN);
 
+#ifdef ENABLE_PIP
+  if (get_process_name(pid, name1, MAXPATHLEN) == 0)
+    return name1;
+#endif
+
   sprintf (name1, "/proc/%d/exe", pid);
   if (readlink (name1, name2, MAXPATHLEN - 1) > 0)
     return name2;

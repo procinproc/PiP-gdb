@@ -147,6 +147,12 @@ enum stop_stack_kind stop_stack_dummy;
 
 int stopped_by_random_signal;
 
+#ifdef ENABLE_PIP
+/* Nonzero if exec_path is not same with /proc/PID/exe  */
+
+int different_exec_path = 0;
+#endif
+
 
 /* Accessor routines.  */
 
@@ -2445,6 +2451,37 @@ attach_command_post_wait (char *args, int from_tty, int async_exec)
 	    full_exec_path = xstrdup (exec_file);
 
 	  exec_file_attach (full_exec_path, from_tty);
+
+#ifdef ENABLE_PIP
+	  /* Retry after attach */
+          {
+	    volatile struct gdb_exception ex;
+
+	    char *new_exec_file;
+	    char *new_full_exec_path = NULL;
+
+	    stop_pc = 0;
+	    TRY_CATCH (ex, RETURN_MASK_ERROR)
+	      {
+	        stop_pc = regcache_read_pc (get_current_regcache ());
+	      }
+	    if (ex.reason < 0 && ex.error != NOT_AVAILABLE_ERROR)
+	      throw_exception (ex);
+
+	    new_exec_file = target_pid_to_exec_file (PIDGET (inferior_ptid));
+	    if (!source_full_path_of (new_exec_file, &new_full_exec_path))
+	      new_full_exec_path = xstrdup (new_exec_file);
+            if (strcmp(full_exec_path, new_full_exec_path) != 0)
+              {
+	        full_exec_path = new_full_exec_path;
+	        exec_file_attach (full_exec_path, from_tty);
+                different_exec_path = 1;
+              }
+            else
+              different_exec_path = 0;
+          }
+#endif
+
 	  symbol_file_add_main (full_exec_path, from_tty);
 	}
     }

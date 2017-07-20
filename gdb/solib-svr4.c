@@ -53,6 +53,11 @@ static int svr4_have_link_map_offsets (void);
 static void svr4_relocate_main_executable (void);
 static void svr4_free_library_list (void *p_list);
 
+#ifdef ENABLE_PIP
+#include "linux-tdep.h"
+static unsigned int svr4_debug = 0;
+#endif
+
 /* Link map info to include in an allocated so_list entry.  */
 
 struct lm_info
@@ -3143,3 +3148,136 @@ _initialize_svr4_solib (void)
   svr4_so_ops.update_breakpoints = svr4_update_solib_event_breakpoints;
   svr4_so_ops.handle_event = svr4_handle_solib_event;
 }
+
+#ifdef ENABLE_PIP
+int svr4_check_link_map (pid_t pid, const char *filename, CORE_ADDR addr)
+{
+  bfd *abfd;
+  CORE_ADDR dyn_ptr = 0;
+  struct bfd_section *sect;
+  int sect_size, arch_size, step;
+
+  gdb_byte *bufend, *bufstart, *buf;
+  CORE_ADDR ptr_addr;
+  struct type *ptr_type;
+
+  struct lm_info *lm_info;
+  CORE_ADDR lm;
+
+  abfd = bfd_openr(filename, NULL);
+  bfd_check_format (abfd, bfd_object);
+
+  sect = bfd_get_section_by_name (abfd, ".dynamic");
+  if (svr4_debug)
+    printf_unfiltered("sect->vma = %lx\n", (unsigned long)sect->vma);
+  sect_size = bfd_section_size (abfd, sect);
+  buf = bufstart = alloca (sect_size);
+  if (!bfd_get_section_contents (abfd, sect, buf, 0, sect_size))
+    {
+       bfd_close(abfd);
+       return 0;
+    }
+
+  arch_size = bfd_get_arch_size (abfd);
+
+  /* Iterate over BUF and scan for DYNTAG.  If found, set PTR and return.  */
+  step = (arch_size == 32) ?
+      sizeof (Elf32_External_Dyn) : sizeof (Elf64_External_Dyn);
+  for (bufend = buf + sect_size; buf < bufend; buf += step)
+    {
+      long dyn_tag;
+      gdb_byte ptr_buf[8];
+
+      if (arch_size == 32)
+        {
+          Elf32_External_Dyn *x_dynp_32;
+          x_dynp_32 = (Elf32_External_Dyn *) buf;
+          dyn_tag = bfd_h_get_32 (abfd, (bfd_byte *) x_dynp_32->d_tag);
+          dyn_ptr = bfd_h_get_32 (abfd, (bfd_byte *) x_dynp_32->d_un.d_ptr);
+        }
+      else
+        {
+          Elf64_External_Dyn *x_dynp_64;
+          x_dynp_64 = (Elf64_External_Dyn *) buf;
+          dyn_tag = bfd_h_get_64 (abfd, (bfd_byte *) x_dynp_64->d_tag);
+          dyn_ptr = bfd_h_get_64 (abfd, (bfd_byte *) x_dynp_64->d_un.d_ptr);
+        }
+       if (dyn_tag == DT_DEBUG)
+         {
+             /* Find DT_DEBUG.  */
+             ptr_type = builtin_type (target_gdbarch ())->builtin_data_ptr;
+             ptr_addr = addr + sect->vma + (buf - bufstart) + arch_size / 8;
+             if (target_read_memory (ptr_addr, ptr_buf, arch_size / 8) == 0)
+               dyn_ptr = extract_typed_address (ptr_buf, ptr_type);
+             if (svr4_debug)
+               printf_unfiltered("dyn_ptr = %lx\n", (unsigned long)dyn_ptr);
+             break;
+         }
+    }
+
+  if (!dyn_ptr)
+    {
+      bfd_close(abfd);
+      return 0;
+    }
+
+  {
+    CORE_ADDR r_map = 0;
+    struct link_map_offsets *lmo = svr4_fetch_link_map_offsets ();
+    struct type *ptr_type = builtin_type (target_gdbarch ())->builtin_data_ptr;
+    r_map = read_memory_typed_address (dyn_ptr + lmo->r_map_offset,
+            ptr_type);
+    if (!r_map)
+      {
+        bfd_close(abfd);
+        return 0;
+      }
+
+    lm_info = lm_info_read(r_map);
+    if (!lm_info)
+      {
+        bfd_close(abfd);
+        return 0;
+      }
+    lm = lm_info->lm_addr;
+  }
+
+  for (; lm != 0; lm = lm_info->l_next)
+    {
+        int errcode;
+        char *buffer;
+
+        lm_info = lm_info_read (lm);
+
+        /* Extract this shared object's name.  */
+        target_read_string (lm_info->l_name, &buffer,
+                SO_NAME_MAX_PATH_SIZE - 1, &errcode);
+        if (errcode != 0)
+          {
+	    warning (_("Can't read pathname for load map: %s."),
+		     safe_strerror (errcode));
+          }
+
+        if (svr4_debug)
+          {
+	    printf_unfiltered("name = %s\n", buffer);
+	    printf_unfiltered("lm_addr = %lx\n",
+		    (unsigned long)lm_info->lm_addr);
+	    printf_unfiltered("l_ld = %lx\n",
+		    (unsigned long)lm_info->l_ld);
+	    printf_unfiltered("l_addr = %lx\n",
+		    (unsigned long)lm_info->l_addr);
+            printf_unfiltered("l_addr_inferior = %lx\n",
+		    (unsigned long)lm_info->l_addr_inferior);
+          }
+
+        xfree (buffer);
+        if (found_pc_in_symbol(pid, lm_info->l_addr_inferior))
+          {
+	    bfd_close(abfd);
+	    return 1;
+          }
+    }
+  return 0;
+}
+#endif
