@@ -2015,4 +2015,47 @@ int found_pc_in_symbol (pid_t pid, ULONGEST addr)
 
   return 0;
 }
+
+int get_process_start_address (ULONGEST *dest_addr,
+			       pid_t pid, const char *processname)
+{
+  char filename[100];
+  char *data;
+  char *line;
+  struct cleanup *cleanup;
+
+  xsnprintf (filename, sizeof filename, "/proc/%ld/maps", (long int)pid);
+  data = target_fileio_read_stralloc (filename);
+  if (!data)
+    {
+      warning (_("unable to open /proc file '%s'"), filename);
+      return -1;
+    }
+
+  cleanup = make_cleanup (xfree, data);
+
+  for (line = strtok (data, "\n"); line; line = strtok (NULL, "\n"))
+    {
+      ULONGEST addr, endaddr, offset, inode;
+      const char *permissions, *device, *filename;
+      size_t permissions_len, device_len;
+
+      read_mapping (line, &addr, &endaddr,
+    		&permissions, &permissions_len,
+    		&offset, &device, &device_len,
+    		&inode, &filename);
+
+      if (strncmp (permissions, "r-x", 3) == 0
+              && strcmp (filename, processname) == 0
+              && svr4_check_link_map (pid, filename, addr))
+        {
+          *dest_addr = addr;
+          do_cleanups (cleanup);
+          return 0;
+        }
+    }
+
+  do_cleanups (cleanup);
+  return 0;
+}
 #endif

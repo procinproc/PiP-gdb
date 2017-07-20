@@ -2844,6 +2844,26 @@ svr4_relocate_main_executable (void)
        - The section offsets were not reset earlier, and the best we can
 	 hope is that the old offsets are still applicable to the new run.  */
 
+#ifdef ENABLE_PIP
+  if (different_exec_path)
+    {
+      int ret;
+      ret = get_process_start_address (
+              &displacement,
+              PIDGET(inferior_ptid), symfile_objfile->name);
+      if (svr4_debug)
+        {
+          printf_filtered ("get_process_start_address (%lx, %d, %s)\n",
+              (unsigned long)displacement, PIDGET(inferior_ptid),
+              symfile_objfile->name);
+        }
+
+      if (displacement == 0)
+        {
+          return;
+        }
+    } else
+#endif
   if (! svr4_exec_displacement (&displacement))
     return;
 
@@ -2862,6 +2882,25 @@ svr4_relocate_main_executable (void)
 	new_offsets->offsets[i] = displacement;
 
       objfile_relocate (symfile_objfile, new_offsets);
+
+#ifdef ENABLE_PIP
+      {
+        struct program_space *pspace, *save_pspace;
+        save_pspace = current_program_space;
+
+        ALL_PSPACES (pspace)
+        {
+            struct objfile *objfile;
+            set_current_program_space (pspace);
+
+            ALL_OBJFILES (objfile)
+            {
+                objfile_relocate (objfile, new_offsets);
+            }
+        }
+        set_current_program_space (save_pspace);
+      }
+#endif
     }
   else if (exec_bfd)
     {

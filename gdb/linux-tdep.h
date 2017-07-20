@@ -39,6 +39,8 @@ extern void linux_init_abi (struct gdbarch_info info, struct gdbarch *gdbarch);
 #ifdef ENABLE_PIP
 extern int get_process_name (pid_t pid, char *dest_name, size_t size);
 extern int found_pc_in_symbol (pid_t pid, ULONGEST addr);
+extern int get_process_start_address (ULONGEST *dest_addr,
+			              pid_t pid, const char *processname);
 #endif
 
 #endif /* linux-tdep.h */
