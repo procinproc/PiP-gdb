@@ -1,0 +1,58 @@
+# Copyright 1997-2013 Free Software Foundation, Inc.
+
+# This program is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation; either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.  */
+
+set binfile gdb.pip/gdb_test
+#set binfile gdb.pip/sleep
+set rootpid [eval exec $binfile &]
+set taskpid [ exec ps -ax | grep $binfile | gawk "{ if (\$1 != $rootpid && \$5 == \"$binfile\" ) print \$1; }" ]
+set escapedbinfile  [string_to_regexp ${binfile}]
+set use_gdb_stub 0
+set timeout 1000
+
+set test "attach to PIP task"
+
+gdb_exit
+gdb_start
+
+# Attach test.
+gdb_test "attach ${taskpid}" ".*Attaching to process $taskpid.*"
+
+# print test.
+gdb_test "print test" "= 20"
+
+# list test.
+# It matches to syscall-template.S
+gdb_test "list" "#endif.*"
+
+# backtrace test.
+gdb_test "backtrace" "main ().*"
+
+# breakpoint test.
+gdb_test "break foo" "Breakpoint .* at .*: foo..*"
+
+# continue test.
+gdb_test "continue" "Continuing.*"
+
+# next test.
+gdb_test "next" "printf(.*).*" "next1"
+gdb_test "next" "}.*" "next2"
+gdb_test "next" "in ?? ().*" "next3"
+gdb_test "next" "Cannot find bounds of current function" "next4"
+
+# Detach test.
+gdb_test "detach" "process $taskpid.*"
+
+# The process must be exit.
+exec sleep 10
