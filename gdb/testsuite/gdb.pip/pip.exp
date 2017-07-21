@@ -42,6 +42,11 @@ gdb_test "backtrace" "main ().*"
 # breakpoint test.
 gdb_test "break foo" "Breakpoint .* at .*: foo..*"
 
+# delete test.
+gdb_test "delete 1" ""
+gdb_test "info breakpoints" "No breakpoints or watchpoints."
+gdb_test "break foo" "Breakpoint .* at .*: foo..*"
+
 # continue test.
 gdb_test "continue" "Continuing.*"
 
