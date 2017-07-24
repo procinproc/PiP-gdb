@@ -16,6 +16,10 @@
 set binfile gdb.pip/gdb_test
 #set binfile gdb.pip/sleep
 set rootpid [eval exec $binfile &]
+
+# The process must be spawned.
+exec sleep 5
+
 set taskpid [ exec ps -ax | grep $binfile | gawk "{ if (\$1 != $rootpid && \$5 == \"$binfile\" ) print \$1; }" ]
 set escapedbinfile  [string_to_regexp ${binfile}]
 set use_gdb_stub 0
