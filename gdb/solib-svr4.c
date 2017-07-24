@@ -3317,6 +3317,7 @@ int svr4_check_link_map (pid_t pid, const char *filename, CORE_ADDR addr)
 	    return 1;
           }
     }
+  bfd_close(abfd);
   return 0;
 }
 #endif
