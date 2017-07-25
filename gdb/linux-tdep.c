@@ -1992,12 +1992,14 @@ int found_pc_in_symbol (pid_t pid, ULONGEST addr)
 
   cleanup = make_cleanup (xfree, data);
 
-  for (line = strtok (data, "\n"); line; line = strtok (NULL, "\n"))
+  for (line = data; line; line = strchr (line, '\n'))
     {
       ULONGEST startaddr, endaddr, offset, inode;
       const char *permissions, *device, *filename;
       size_t permissions_len, device_len;
 
+      if (line != data)
+          line++;
       read_mapping (line, &startaddr, &endaddr,
     		&permissions, &permissions_len,
     		&offset, &device, &device_len,
