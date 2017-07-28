@@ -1941,7 +1941,7 @@ static FILE *get_pid_maps (pid_t pid)
 int get_process_name (pid_t pid, char *dest_name, size_t size)
 {
   FILE *file;
-  char *line;
+  char line[512];
   int ret = 1;
 
   file = get_pid_maps (pid);
@@ -1980,29 +1980,23 @@ int get_process_name (pid_t pid, char *dest_name, size_t size)
 
 int found_pc_in_symbol (pid_t pid, ULONGEST addr)
 {
-  char filename[100];
-  char *data;
-  char *line;
-  struct cleanup *cleanup;
+  FILE *file;
+  char line[512];
+  int ret = 0;
 
-  xsnprintf (filename, sizeof filename, "/proc/%ld/maps", (long int)pid);
-  data = target_fileio_read_stralloc (filename);
-  if (!data)
+  file = get_pid_maps (pid);
+  if (!file)
     {
-      warning (_("unable to open /proc file '%s'"), filename);
-      return 0;
+      warning (_("unable to open /proc file '%ld'"), (long int)pid);
+      return -1;
     }
 
-  cleanup = make_cleanup (xfree, data);
-
-  for (line = data; line; line = strchr (line, '\n'))
+  while (fgets(line, sizeof(line), file) != NULL)
     {
       ULONGEST startaddr, endaddr, offset, inode;
       const char *permissions, *device, *filename;
       size_t permissions_len, device_len;
 
-      if (line != data)
-          line++;
       read_mapping (line, &startaddr, &endaddr,
     		&permissions, &permissions_len,
     		&offset, &device, &device_len,
@@ -2011,35 +2005,30 @@ int found_pc_in_symbol (pid_t pid, ULONGEST addr)
       if (strncmp (permissions, "r-x", 3) == 0 && addr == startaddr
               && startaddr <= stop_pc && stop_pc <= endaddr)
         {
-          do_cleanups (cleanup);
-          return 1;
+          ret = 1;
+          break;
         }
     }
 
-  do_cleanups (cleanup);
-
-  return 0;
+  fclose (file);
+  return ret;
 }
 
 int get_process_start_address (ULONGEST *dest_addr,
 			       pid_t pid, const char *processname)
 {
-  char filename[100];
-  char *data;
+  FILE *file;
   char *line;
-  struct cleanup *cleanup;
+  int ret = 1;
 
-  xsnprintf (filename, sizeof filename, "/proc/%ld/maps", (long int)pid);
-  data = target_fileio_read_stralloc (filename);
-  if (!data)
+  file = get_pid_maps (pid);
+  if (!file)
     {
-      warning (_("unable to open /proc file '%s'"), filename);
+      warning (_("unable to open /proc file '%ld'"), (long int)pid);
       return -1;
     }
 
-  cleanup = make_cleanup (xfree, data);
-
-  for (line = strtok (data, "\n"); line; line = strtok (NULL, "\n"))
+  while (fgets(line, sizeof(line), file) != NULL)
     {
       ULONGEST addr, endaddr, offset, inode;
       const char *permissions, *device, *filename;
@@ -2055,33 +2044,29 @@ int get_process_start_address (ULONGEST *dest_addr,
               && svr4_check_link_map (pid, filename, addr))
         {
           *dest_addr = addr;
-          do_cleanups (cleanup);
-          return 0;
+          ret = 0;
+          break;
         }
     }
 
-  do_cleanups (cleanup);
-  return 0;
+  fclose (file);
+  return ret;
 }
 
 int check_pip (pid_t pid)
 {
-  char filename[100];
-  char *data;
-  char *line;
-  struct cleanup *cleanup;
+  FILE *file;
+  char line[512];
+  int ret = 0;
 
-  xsnprintf (filename, sizeof filename, "/proc/%ld/maps", (long int)pid);
-  data = target_fileio_read_stralloc (filename);
-  if (!data)
+  file = get_pid_maps (pid);
+  if (!file)
     {
-      warning (_("unable to open /proc file '%s'"), filename);
+      warning (_("unable to open /proc file '%ld'"), (long int)pid);
       return -1;
     }
 
-  cleanup = make_cleanup (xfree, data);
-
-  for (line = strtok (data, "\n"); line; line = strtok (NULL, "\n"))
+  while (fgets(line, sizeof(line), file) != NULL)
     {
       ULONGEST addr, endaddr, offset, inode;
       const char *permissions, *device, *filename;
@@ -2096,12 +2081,12 @@ int check_pip (pid_t pid)
       str = strstr (filename, "/libpip.so");
       if (str != NULL && strcmp (str, "/libpip.so") == 0)
         {
-          do_cleanups (cleanup);
-          return 1;
+          ret = 1;
+          break;
         }
     }
 
-  do_cleanups (cleanup);
-  return 0;
+  fclose (file);
+  return ret;
 }
 #endif
