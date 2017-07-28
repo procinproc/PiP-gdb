@@ -1931,24 +1931,27 @@ about this file, refer to the manpage of core(5)."),
 }
 
 #ifdef ENABLE_PIP
-int get_process_name (pid_t pid, char *dest_name, size_t size)
+static FILE *get_pid_maps (pid_t pid)
 {
   char filename[100];
-  char *data;
-  char *line;
-  struct cleanup *cleanup;
-
   xsnprintf (filename, sizeof filename, "/proc/%ld/maps", (long int)pid);
-  data = target_fileio_read_stralloc (filename);
-  if (!data)
+  return fopen(filename, "r");
+}
+
+int get_process_name (pid_t pid, char *dest_name, size_t size)
+{
+  FILE *file;
+  char *line;
+  int ret = 1;
+
+  file = get_pid_maps (pid);
+  if (!file)
     {
-      warning (_("unable to open /proc file '%s'"), filename);
+      warning (_("unable to open /proc file '%ld'"), (long int)pid);
       return -1;
     }
 
-  cleanup = make_cleanup (xfree, data);
-
-  for (line = strtok (data, "\n"); line; line = strtok (NULL, "\n"))
+  while (fgets(line, sizeof(line), file) != NULL)
     {
       ULONGEST addr, endaddr, offset, inode;
       const char *permissions, *device, *filename;
@@ -1966,13 +1969,13 @@ int get_process_name (pid_t pid, char *dest_name, size_t size)
               && svr4_check_link_map (pid, filename, addr))
         {
           xsnprintf (dest_name, size, "%s", filename);
-          do_cleanups (cleanup);
-          return 0;
+          ret = 0;
+          break;
         }
     }
 
-  do_cleanups (cleanup);
-  return 1;
+  fclose (file);
+  return ret;
 }
 
 int found_pc_in_symbol (pid_t pid, ULONGEST addr)
