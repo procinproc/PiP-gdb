@@ -2845,24 +2845,9 @@ svr4_relocate_main_executable (void)
 	 hope is that the old offsets are still applicable to the new run.  */
 
 #ifdef ENABLE_PIP
-  if (different_exec_path)
-    {
-      int ret;
-      ret = get_process_start_address (
-              &displacement,
-              PIDGET(inferior_ptid), symfile_objfile->name);
-      if (svr4_debug)
-        {
-          printf_filtered ("get_process_start_address (%lx, %d, %s)\n",
-              (unsigned long)displacement, PIDGET(inferior_ptid),
-              symfile_objfile->name);
-        }
-
-      if (displacement == 0)
-        {
-          return;
-        }
-    } else
+  if (pip_start_address != 0)
+    displacement = pip_start_address;
+  else
 #endif
   if (! svr4_exec_displacement (&displacement))
     return;

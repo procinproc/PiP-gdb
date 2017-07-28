@@ -4438,7 +4438,7 @@ linux_child_pid_to_exec_file (int pid)
   memset (name2, 0, MAXPATHLEN);
 
 #ifdef ENABLE_PIP
-  if (get_process_name(pid, name1, MAXPATHLEN) == 0)
+  if (get_pip_process(pid, name1, MAXPATHLEN, &pip_start_address) == 0)
     return name1;
 #endif
 

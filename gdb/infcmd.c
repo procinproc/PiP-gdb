@@ -58,6 +58,10 @@
 #include "linespec.h"
 #include "cli/cli-utils.h"
 
+#ifdef ENABLE_PIP
+#include "linux-tdep.h"
+#endif
+
 /* Local functions: */
 
 static void nofp_registers_info (char *, int);
@@ -146,12 +150,6 @@ enum stop_stack_kind stop_stack_dummy;
    process.  */
 
 int stopped_by_random_signal;
-
-#ifdef ENABLE_PIP
-/* Nonzero if exec_path is not same with /proc/PID/exe  */
-
-int different_exec_path = 0;
-#endif
 
 
 /* Accessor routines.  */
@@ -2475,10 +2473,7 @@ attach_command_post_wait (char *args, int from_tty, int async_exec)
               {
 	        full_exec_path = new_full_exec_path;
 	        exec_file_attach (full_exec_path, from_tty);
-                different_exec_path = 1;
               }
-            else
-              different_exec_path = 0;
           }
 #endif
 

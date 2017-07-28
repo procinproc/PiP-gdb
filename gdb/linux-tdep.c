@@ -43,6 +43,8 @@
 #include "objfiles.h"
 #include "solib-svr4.h"
 #include "cli/cli-decode.h"
+
+ULONGEST pip_start_address = 0;
 #endif
 
 /* This enum represents the values that the user can choose when
@@ -1938,11 +1940,13 @@ static FILE *get_pid_maps (pid_t pid)
   return fopen(filename, "r");
 }
 
-int get_process_name (pid_t pid, char *dest_name, size_t size)
+int get_pip_process (pid_t pid, char *dest_name, size_t size, ULONGEST *dest_addr)
 {
   FILE *file;
   char line[512];
   int ret = 1;
+
+  *dest_addr = 0;
 
   file = get_pid_maps (pid);
   if (!file)
@@ -1968,6 +1972,7 @@ int get_process_name (pid_t pid, char *dest_name, size_t size)
               && strcmp(filename, "[vsyscall]") != 0
               && svr4_check_link_map (pid, filename, addr))
         {
+          *dest_addr = addr;
           xsnprintf (dest_name, size, "%s", filename);
           ret = 0;
           break;
@@ -2006,45 +2011,6 @@ int found_pc_in_symbol (pid_t pid, ULONGEST addr)
               && startaddr <= stop_pc && stop_pc <= endaddr)
         {
           ret = 1;
-          break;
-        }
-    }
-
-  fclose (file);
-  return ret;
-}
-
-int get_process_start_address (ULONGEST *dest_addr,
-			       pid_t pid, const char *processname)
-{
-  FILE *file;
-  char *line;
-  int ret = 1;
-
-  file = get_pid_maps (pid);
-  if (!file)
-    {
-      warning (_("unable to open /proc file '%ld'"), (long int)pid);
-      return -1;
-    }
-
-  while (fgets(line, sizeof(line), file) != NULL)
-    {
-      ULONGEST addr, endaddr, offset, inode;
-      const char *permissions, *device, *filename;
-      size_t permissions_len, device_len;
-
-      read_mapping (line, &addr, &endaddr,
-    		&permissions, &permissions_len,
-    		&offset, &device, &device_len,
-    		&inode, &filename);
-
-      if (strncmp (permissions, "r-x", 3) == 0
-              && strcmp (filename, processname) == 0
-              && svr4_check_link_map (pid, filename, addr))
-        {
-          *dest_addr = addr;
-          ret = 0;
           break;
         }
     }
