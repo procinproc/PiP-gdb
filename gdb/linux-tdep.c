@@ -2060,4 +2060,45 @@ int get_process_start_address (ULONGEST *dest_addr,
   do_cleanups (cleanup);
   return 0;
 }
+
+int check_pip (pid_t pid)
+{
+  char filename[100];
+  char *data;
+  char *line;
+  struct cleanup *cleanup;
+
+  xsnprintf (filename, sizeof filename, "/proc/%ld/maps", (long int)pid);
+  data = target_fileio_read_stralloc (filename);
+  if (!data)
+    {
+      warning (_("unable to open /proc file '%s'"), filename);
+      return -1;
+    }
+
+  cleanup = make_cleanup (xfree, data);
+
+  for (line = strtok (data, "\n"); line; line = strtok (NULL, "\n"))
+    {
+      ULONGEST addr, endaddr, offset, inode;
+      const char *permissions, *device, *filename;
+      size_t permissions_len, device_len;
+      char *str;
+
+      read_mapping (line, &addr, &endaddr,
+    		&permissions, &permissions_len,
+    		&offset, &device, &device_len,
+    		&inode, &filename);
+
+      str = strstr (filename, "/libpip.so");
+      if (str != NULL && strcmp (str, "/libpip.so") == 0)
+        {
+          do_cleanups (cleanup);
+          return 1;
+        }
+    }
+
+  do_cleanups (cleanup);
+  return 0;
+}
 #endif

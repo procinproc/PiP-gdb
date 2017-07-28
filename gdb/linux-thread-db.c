@@ -47,6 +47,10 @@
 #include <signal.h>
 #include <ctype.h>
 
+#ifdef ENABLE_PIP
+#include "linux-tdep.h"
+#endif
+
 /* GNU/Linux libthread_db support.
 
    libthread_db is a library, provided along with libpthread.so, which
@@ -1695,6 +1699,11 @@ find_new_threads_once (struct thread_db_info *info, int iteration,
 
   data.info = info;
   data.new_threads = 0;
+
+#ifdef ENABLE_PIP
+  if (check_pip(PIDGET(inferior_ptid)))
+    return 0;
+#endif
 
   TRY_CATCH (except, RETURN_MASK_ERROR)
     {
