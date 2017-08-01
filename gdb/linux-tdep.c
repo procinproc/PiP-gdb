@@ -39,12 +39,14 @@
 #include <ctype.h>
 
 #ifdef ENABLE_PIP
+#include "bfd.h"
 #include "symfile.h"
 #include "objfiles.h"
 #include "solib-svr4.h"
 #include "cli/cli-decode.h"
 
 ULONGEST pip_start_address = 0;
+static unsigned int linux_tdep_debug = 0;
 #endif
 
 /* This enum represents the values that the user can choose when
@@ -1958,15 +1960,11 @@ static int read_maps (char *line, size_t size, FILE *file, struct pid_maps *maps
   int last_index = 0;
 
   if (fgets(line, size, file) == NULL)
-    {
-      return 1;
-    }
+    return 1;
 
   last_index = strlen(line) - 1;
   if (last_index > 0 && line[last_index] == '\n')
-    {
-      line[last_index] = '\0';
-    }
+    line[last_index] = '\0';
 
   read_mapping (line, &maps->start_addr, &maps->end_addr,
     		&maps->permissions, &maps->permissions_len,
@@ -1974,6 +1972,80 @@ static int read_maps (char *line, size_t size, FILE *file, struct pid_maps *maps
     		&maps->inode, &maps->filename);
 
   return 0;
+}
+
+static int check_link_map (pid_t pid, const char *filename, CORE_ADDR addr)
+{
+  bfd *abfd;
+  CORE_ADDR dyn_ptr = 0;
+  struct bfd_section *sect;
+  int sect_size, arch_size, step;
+
+  gdb_byte *bufend, *bufstart, *buf;
+  struct type *ptr_type;
+
+  abfd = bfd_openr(filename, NULL);
+  if (abfd == NULL)
+    return 0;
+
+  bfd_check_format (abfd, bfd_object);
+
+  sect = bfd_get_section_by_name (abfd, ".dynamic");
+  if (linux_tdep_debug)
+    printf_unfiltered("sect->vma = %lx\n", (unsigned long)sect->vma);
+  sect_size = bfd_section_size (abfd, sect);
+  buf = bufstart = alloca (sect_size);
+  if (!bfd_get_section_contents (abfd, sect, buf, 0, sect_size))
+    {
+       bfd_close(abfd);
+       return 0;
+    }
+
+  arch_size = bfd_get_arch_size (abfd);
+
+  /* Iterate over BUF and scan for DYNTAG.  If found, set PTR and return.  */
+  step = (arch_size == 32) ?
+      sizeof (Elf32_External_Dyn) : sizeof (Elf64_External_Dyn);
+  for (bufend = buf + sect_size; buf < bufend; buf += step)
+    {
+      long dyn_tag;
+      gdb_byte ptr_buf[8];
+
+      if (arch_size == 32)
+        {
+          Elf32_External_Dyn *x_dynp_32;
+          x_dynp_32 = (Elf32_External_Dyn *) buf;
+          dyn_tag = bfd_h_get_32 (abfd, (bfd_byte *) x_dynp_32->d_tag);
+          dyn_ptr = bfd_h_get_32 (abfd, (bfd_byte *) x_dynp_32->d_un.d_ptr);
+        }
+      else
+        {
+          Elf64_External_Dyn *x_dynp_64;
+          x_dynp_64 = (Elf64_External_Dyn *) buf;
+          dyn_tag = bfd_h_get_64 (abfd, (bfd_byte *) x_dynp_64->d_tag);
+          dyn_ptr = bfd_h_get_64 (abfd, (bfd_byte *) x_dynp_64->d_un.d_ptr);
+        }
+       if (dyn_tag == DT_DEBUG)
+         {
+             CORE_ADDR ptr_addr;
+
+             /* Find DT_DEBUG.  */
+             ptr_type = builtin_type (target_gdbarch ())->builtin_data_ptr;
+             ptr_addr = addr + sect->vma + (buf - bufstart) + arch_size / 8;
+             if (target_read_memory (ptr_addr, ptr_buf, arch_size / 8) == 0)
+               dyn_ptr = extract_typed_address (ptr_buf, ptr_type);
+             if (linux_tdep_debug)
+               printf_unfiltered("dyn_ptr = %lx\n", (unsigned long)dyn_ptr);
+             break;
+         }
+    }
+
+  bfd_close(abfd);
+
+  if (!dyn_ptr)
+    return 0;
+
+  return svr4_check_link_map (pid, dyn_ptr);
 }
 
 int get_pip_process (pid_t pid, char *dest_name, size_t size, ULONGEST *dest_addr)
@@ -1999,7 +2071,7 @@ int get_pip_process (pid_t pid, char *dest_name, size_t size, ULONGEST *dest_add
               && strlen(maps.filename) != 0
               && strcmp(maps.filename, "[vdso]") != 0
               && strcmp(maps.filename, "[vsyscall]") != 0
-              && svr4_check_link_map (pid, maps.filename, maps.start_addr))
+              && check_link_map (pid, maps.filename, maps.start_addr))
         {
           *dest_addr = maps.start_addr;
           xsnprintf (dest_name, size, "%s", maps.filename);
