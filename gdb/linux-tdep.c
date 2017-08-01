@@ -1933,6 +1933,19 @@ about this file, refer to the manpage of core(5)."),
 }
 
 #ifdef ENABLE_PIP
+struct pid_maps
+  {
+    ULONGEST addr;
+    ULONGEST endaddr;
+    const char *permissions;
+    size_t permissions_len;
+    ULONGEST offset;
+    const char *device;
+    size_t device_len;
+    ULONGEST inode;
+    const char *filename;
+  };
+
 static FILE *get_pid_maps (pid_t pid)
 {
   char filename[100];
@@ -1940,11 +1953,35 @@ static FILE *get_pid_maps (pid_t pid)
   return fopen(filename, "r");
 }
 
+static int read_maps (const char *line, size_t size, FILE *file, struct pid_maps *maps)
+{
+  int last_index = 0;
+
+  if (fgets(line, size, file) == NULL)
+    {
+      return 1;
+    }
+
+  last_index = strlen(line) - 1;
+  if (last_index > 0 && line[last_index] == '\n')
+    {
+      line[last_index] = '\0';
+    }
+
+  read_mapping (maps->line, &maps->addr, &maps->endaddr,
+    		&maps->permissions, &maps->permissions_len,
+    		&maps->offset, &maps->device, &maps->device_len,
+    		&maps->inode, &maps->filename);
+
+  return 0;
+}
+
 int get_pip_process (pid_t pid, char *dest_name, size_t size, ULONGEST *dest_addr)
 {
   FILE *file;
   char line[512];
   int ret = 1;
+  struct pid_maps maps;
 
   *dest_addr = 0;
 
@@ -1955,22 +1992,14 @@ int get_pip_process (pid_t pid, char *dest_name, size_t size, ULONGEST *dest_add
       return -1;
     }
 
-  while (fgets(line, sizeof(line), file) != NULL)
+  while (!read_maps(line, sizeof(line), file, &maps))
     {
-      ULONGEST addr, endaddr, offset, inode;
-      const char *permissions, *device, *filename;
-      size_t permissions_len, device_len;
 
-      read_mapping (line, &addr, &endaddr,
-    		&permissions, &permissions_len,
-    		&offset, &device, &device_len,
-    		&inode, &filename);
-
-      if (strncmp (permissions, "r-x", 3) == 0
-              && strlen(filename) != 0
-              && strcmp(filename, "[vdso]") != 0
-              && strcmp(filename, "[vsyscall]") != 0
-              && svr4_check_link_map (pid, filename, addr))
+      if (strncmp (maps.permissions, "r-x", 3) == 0
+              && strlen(maps.filename) != 0
+              && strcmp(maps.filename, "[vdso]") != 0
+              && strcmp(maps.filename, "[vsyscall]") != 0
+              && svr4_check_link_map (pid, maps.filename, maps.addr))
         {
           *dest_addr = addr;
           xsnprintf (dest_name, size, "%s", filename);
@@ -1988,6 +2017,7 @@ int found_pc_in_symbol (pid_t pid, ULONGEST addr)
   FILE *file;
   char line[512];
   int ret = 0;
+  struct pid_maps maps;
 
   file = get_pid_maps (pid);
   if (!file)
@@ -1996,19 +2026,11 @@ int found_pc_in_symbol (pid_t pid, ULONGEST addr)
       return -1;
     }
 
-  while (fgets(line, sizeof(line), file) != NULL)
+  while (!read_maps(line, sizeof(line), file, &maps))
     {
-      ULONGEST startaddr, endaddr, offset, inode;
-      const char *permissions, *device, *filename;
-      size_t permissions_len, device_len;
-
-      read_mapping (line, &startaddr, &endaddr,
-    		&permissions, &permissions_len,
-    		&offset, &device, &device_len,
-    		&inode, &filename);
-
-      if (strncmp (permissions, "r-x", 3) == 0 && addr == startaddr
-              && startaddr <= stop_pc && stop_pc <= endaddr)
+      if (strncmp (maps.permissions, "r-x", 3) == 0
+              && addr == maps.startaddr
+              && maps.startaddr <= stop_pc && stop_pc <= maps.endaddr)
         {
           ret = 1;
           break;
@@ -2024,6 +2046,7 @@ int check_pip (pid_t pid)
   FILE *file;
   char line[512];
   int ret = 0;
+  struct pid_maps maps;
 
   file = get_pid_maps (pid);
   if (!file)
@@ -2032,19 +2055,9 @@ int check_pip (pid_t pid)
       return -1;
     }
 
-  while (fgets(line, sizeof(line), file) != NULL)
+  while (!read_maps(line, sizeof(line), file, &maps))
     {
-      ULONGEST addr, endaddr, offset, inode;
-      const char *permissions, *device, *filename;
-      size_t permissions_len, device_len;
-      char *str;
-
-      read_mapping (line, &addr, &endaddr,
-    		&permissions, &permissions_len,
-    		&offset, &device, &device_len,
-    		&inode, &filename);
-
-      str = strstr (filename, "/libpip.so");
+      str = strstr (maps.filename, "/libpip.so");
       if (str != NULL && strcmp (str, "/libpip.so") == 0)
         {
           ret = 1;
