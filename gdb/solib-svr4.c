@@ -3189,6 +3189,11 @@ int svr4_check_link_map (pid_t pid, const char *filename, CORE_ADDR addr)
   CORE_ADDR lm;
 
   abfd = bfd_openr(filename, NULL);
+  if (abfd == NULL)
+    {
+      return 0;
+    }
+
   bfd_check_format (abfd, bfd_object);
 
   sect = bfd_get_section_by_name (abfd, ".dynamic");

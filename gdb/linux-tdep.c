@@ -1935,8 +1935,8 @@ about this file, refer to the manpage of core(5)."),
 #ifdef ENABLE_PIP
 struct pid_maps
   {
-    ULONGEST addr;
-    ULONGEST endaddr;
+    ULONGEST start_addr;
+    ULONGEST end_addr;
     const char *permissions;
     size_t permissions_len;
     ULONGEST offset;
@@ -1953,7 +1953,7 @@ static FILE *get_pid_maps (pid_t pid)
   return fopen(filename, "r");
 }
 
-static int read_maps (const char *line, size_t size, FILE *file, struct pid_maps *maps)
+static int read_maps (char *line, size_t size, FILE *file, struct pid_maps *maps)
 {
   int last_index = 0;
 
@@ -1968,7 +1968,7 @@ static int read_maps (const char *line, size_t size, FILE *file, struct pid_maps
       line[last_index] = '\0';
     }
 
-  read_mapping (maps->line, &maps->addr, &maps->endaddr,
+  read_mapping (line, &maps->start_addr, &maps->end_addr,
     		&maps->permissions, &maps->permissions_len,
     		&maps->offset, &maps->device, &maps->device_len,
     		&maps->inode, &maps->filename);
@@ -1999,10 +1999,10 @@ int get_pip_process (pid_t pid, char *dest_name, size_t size, ULONGEST *dest_add
               && strlen(maps.filename) != 0
               && strcmp(maps.filename, "[vdso]") != 0
               && strcmp(maps.filename, "[vsyscall]") != 0
-              && svr4_check_link_map (pid, maps.filename, maps.addr))
+              && svr4_check_link_map (pid, maps.filename, maps.start_addr))
         {
-          *dest_addr = addr;
-          xsnprintf (dest_name, size, "%s", filename);
+          *dest_addr = maps.start_addr;
+          xsnprintf (dest_name, size, "%s", maps.filename);
           ret = 0;
           break;
         }
@@ -2029,8 +2029,8 @@ int found_pc_in_symbol (pid_t pid, ULONGEST addr)
   while (!read_maps(line, sizeof(line), file, &maps))
     {
       if (strncmp (maps.permissions, "r-x", 3) == 0
-              && addr == maps.startaddr
-              && maps.startaddr <= stop_pc && stop_pc <= maps.endaddr)
+              && addr == maps.start_addr
+              && maps.start_addr <= stop_pc && stop_pc <= maps.end_addr)
         {
           ret = 1;
           break;
@@ -2057,6 +2057,8 @@ int check_pip (pid_t pid)
 
   while (!read_maps(line, sizeof(line), file, &maps))
     {
+      char *str;
+
       str = strstr (maps.filename, "/libpip.so");
       if (str != NULL && strcmp (str, "/libpip.so") == 0)
         {
