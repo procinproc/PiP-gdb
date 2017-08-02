@@ -1951,8 +1951,12 @@ struct pid_maps
 static FILE *get_pid_maps (pid_t pid)
 {
   char filename[100];
+  FILE *fp;
   xsnprintf (filename, sizeof filename, "/proc/%ld/maps", (long int)pid);
-  return fopen(filename, "r");
+  fp = fopen(filename, "r");
+  if (!fp)
+    warning (_("unable to open /proc file '%ld'"), (long int)pid);
+  return fp;
 }
 
 static int read_maps (char *line, size_t size, FILE *file, struct pid_maps *maps)
@@ -2010,6 +2014,7 @@ static int check_link_map (pid_t pid, const char *filename, CORE_ADDR addr)
     {
       long dyn_tag;
       gdb_byte ptr_buf[8];
+      CORE_ADDR ptr_addr;
 
       if (arch_size == 32)
         {
@@ -2025,19 +2030,18 @@ static int check_link_map (pid_t pid, const char *filename, CORE_ADDR addr)
           dyn_tag = bfd_h_get_64 (abfd, (bfd_byte *) x_dynp_64->d_tag);
           dyn_ptr = bfd_h_get_64 (abfd, (bfd_byte *) x_dynp_64->d_un.d_ptr);
         }
-       if (dyn_tag == DT_DEBUG)
-         {
-             CORE_ADDR ptr_addr;
 
-             /* Find DT_DEBUG.  */
-             ptr_type = builtin_type (target_gdbarch ())->builtin_data_ptr;
-             ptr_addr = addr + sect->vma + (buf - bufstart) + arch_size / 8;
-             if (target_read_memory (ptr_addr, ptr_buf, arch_size / 8) == 0)
-               dyn_ptr = extract_typed_address (ptr_buf, ptr_type);
-             if (linux_tdep_debug)
-               printf_unfiltered("dyn_ptr = %lx\n", (unsigned long)dyn_ptr);
-             break;
-         }
+       if (dyn_tag != DT_DEBUG)
+         continue;
+
+       /* Find DT_DEBUG.  */
+       ptr_type = builtin_type (target_gdbarch ())->builtin_data_ptr;
+       ptr_addr = addr + sect->vma + (buf - bufstart) + arch_size / 8;
+       if (target_read_memory (ptr_addr, ptr_buf, arch_size / 8) == 0)
+         dyn_ptr = extract_typed_address (ptr_buf, ptr_type);
+       if (linux_tdep_debug)
+         printf_unfiltered("dyn_ptr = %lx\n", (unsigned long)dyn_ptr);
+       break;
     }
 
   bfd_close(abfd);
@@ -2059,10 +2063,7 @@ int get_pip_process (pid_t pid, char *dest_name, size_t size, ULONGEST *dest_add
 
   file = get_pid_maps (pid);
   if (!file)
-    {
-      warning (_("unable to open /proc file '%ld'"), (long int)pid);
-      return -1;
-    }
+    return -1;
 
   while (!read_maps(line, sizeof(line), file, &maps))
     {
@@ -2093,10 +2094,7 @@ int found_pc_in_symbol (pid_t pid, ULONGEST addr)
 
   file = get_pid_maps (pid);
   if (!file)
-    {
-      warning (_("unable to open /proc file '%ld'"), (long int)pid);
-      return -1;
-    }
+    return 0;
 
   while (!read_maps(line, sizeof(line), file, &maps))
     {
@@ -2122,10 +2120,7 @@ int check_pip (pid_t pid)
 
   file = get_pid_maps (pid);
   if (!file)
-    {
-      warning (_("unable to open /proc file '%ld'"), (long int)pid);
-      return -1;
-    }
+    return 0;
 
   while (!read_maps(line, sizeof(line), file, &maps))
     {
