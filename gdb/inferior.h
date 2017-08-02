@@ -268,12 +268,6 @@ extern struct value *get_return_value (struct value *function,
 
 extern CORE_ADDR stop_pc;
 
-#ifdef ENABLE_PIP
-/* Nonzero if exec_path is not same with /proc/PID/exe  */
-
-extern int different_exec_path;
-#endif
-
 /* Nonzero if stopped due to completion of a stack dummy routine.  */
 
 extern enum stop_stack_kind stop_stack_dummy;
