@@ -2867,25 +2867,6 @@ svr4_relocate_main_executable (void)
 	new_offsets->offsets[i] = displacement;
 
       objfile_relocate (symfile_objfile, new_offsets);
-
-#ifdef ENABLE_PIP
-      {
-        struct program_space *pspace, *save_pspace;
-        save_pspace = current_program_space;
-
-        ALL_PSPACES (pspace)
-        {
-            struct objfile *objfile;
-            set_current_program_space (pspace);
-
-            ALL_OBJFILES (objfile)
-            {
-                objfile_relocate (objfile, new_offsets);
-            }
-        }
-        set_current_program_space (save_pspace);
-      }
-#endif
     }
   else if (exec_bfd)
     {
