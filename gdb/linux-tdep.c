@@ -2058,8 +2058,21 @@ int get_pip_process (pid_t pid, char *dest_name, size_t size, ULONGEST *dest_add
   char line[512];
   int ret = 1;
   struct pid_maps maps;
+  volatile struct gdb_exception ex;
 
   *dest_addr = 0;
+
+  if (!check_pip (pid))
+    return -1;
+
+  /* Initialize PC */
+  stop_pc = 0;
+  TRY_CATCH (ex, RETURN_MASK_ERROR)
+    {
+      stop_pc = regcache_read_pc (get_current_regcache ());
+    }
+  if (ex.reason < 0 && ex.error != NOT_AVAILABLE_ERROR)
+    throw_exception (ex);
 
   file = get_pid_maps (pid);
   if (!file)

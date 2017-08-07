@@ -2454,25 +2454,16 @@ attach_command_post_wait (char *args, int from_tty, int async_exec)
 #ifdef ENABLE_PIP
 	  /* Search pip process after attach */
           {
-	    volatile struct gdb_exception ex;
-
 	    char *new_exec_file;
-	    char *new_full_exec_path = NULL;
 
 	    new_exec_file = xmalloc (MAXPATHLEN);
 	    make_cleanup (xfree, new_exec_file);
 
-	    stop_pc = 0;
-	    TRY_CATCH (ex, RETURN_MASK_ERROR)
-	      {
-	        stop_pc = regcache_read_pc (get_current_regcache ());
-	      }
-	    if (ex.reason < 0 && ex.error != NOT_AVAILABLE_ERROR)
-	      throw_exception (ex);
-
 	    if (get_pip_process(PIDGET (inferior_ptid),
                         new_exec_file, MAXPATHLEN, &pip_start_address) == 0)
 	      {
+	        char *new_full_exec_path = NULL;
+
 	        if (!source_full_path_of (new_exec_file, &new_full_exec_path))
 	          new_full_exec_path = xstrdup (new_exec_file);
 	        full_exec_path = new_full_exec_path;
