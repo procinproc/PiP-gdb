@@ -1,0 +1,46 @@
+# Copyright 1997-2013 Free Software Foundation, Inc.
+
+# This program is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation; either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.  */
+
+set binfile gdb.pip/gdb_test
+set env(PIP_MODE) pthread
+set rootpid [eval exec $binfile &]
+
+# The process must be spawned.
+exec sleep 5
+
+set escapedbinfile  [string_to_regexp ${binfile}]
+set use_gdb_stub 0
+set timeout 1000
+
+set test "attach to PIP task"
+
+gdb_exit
+gdb_start
+
+# Attach test.
+gdb_test "attach ${rootpid}" ".*Attaching to process $rootpid.*"
+
+# info threads test.
+gdb_test "info threads" ".*  2 .* Thread .*"
+
+gdb_test "thread 2" ".*Switching to thread 2.*"
+
+gdb_test "info threads" ".*\\* 2 .* Thread .*"
+
+# Detach test.
+gdb_test "detach" "process $rootpid.*"
+
+# The process must be exit.
+exec sleep 10
