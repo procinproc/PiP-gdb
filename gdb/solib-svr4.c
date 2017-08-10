@@ -3174,34 +3174,34 @@ int svr4_check_link_map (pid_t pid, CORE_ADDR dyn_ptr)
 
   for (; lm != 0; lm = lm_info->l_next)
     {
-        lm_info = lm_info_read (lm);
+      lm_info = lm_info_read (lm);
 
-        if (svr4_debug)
-          {
-	    char *buffer;
-	    int errcode;
+      if (svr4_debug)
+	{
+	  char *buffer;
+	  int errcode;
 
-            /* Extract this shared object's name.  */
-            target_read_string (lm_info->l_name, &buffer,
-                    SO_NAME_MAX_PATH_SIZE - 1, &errcode);
-            if (errcode != 0)
-	      warning (_("Can't read pathname for load map: %s."),
-	    	     safe_strerror (errcode));
+	  /* Extract this shared object's name.  */
+	  target_read_string (lm_info->l_name, &buffer,
+			      SO_NAME_MAX_PATH_SIZE - 1, &errcode);
+	  if (errcode != 0)
+	    warning (_("Can't read pathname for load map: %s."),
+		     safe_strerror (errcode));
 
-	    printf_unfiltered("name = %s\n", buffer);
-	    printf_unfiltered("lm_addr = %lx\n",
-		    (unsigned long)lm_info->lm_addr);
-	    printf_unfiltered("l_ld = %lx\n",
-		    (unsigned long)lm_info->l_ld);
-	    printf_unfiltered("l_addr = %lx\n",
-		    (unsigned long)lm_info->l_addr);
-            printf_unfiltered("l_addr_inferior = %lx\n",
-		    (unsigned long)lm_info->l_addr_inferior);
-            xfree (buffer);
-          }
+	  printf_unfiltered("name = %s\n", buffer);
+	  printf_unfiltered("lm_addr = %lx\n",
+			    (unsigned long)lm_info->lm_addr);
+	  printf_unfiltered("l_ld = %lx\n",
+			    (unsigned long)lm_info->l_ld);
+	  printf_unfiltered("l_addr = %lx\n",
+			    (unsigned long)lm_info->l_addr);
+	  printf_unfiltered("l_addr_inferior = %lx\n",
+			    (unsigned long)lm_info->l_addr_inferior);
+	  xfree (buffer);
+	}
 
-        if (found_pc_in_symbol(pid, lm_info->l_addr_inferior))
-	  return 1;
+      if (found_pc_in_symbol(pid, lm_info->l_addr_inferior))
+	return 1;
     }
   return 0;
 }

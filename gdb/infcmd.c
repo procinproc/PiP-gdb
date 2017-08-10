@@ -2453,23 +2453,22 @@ attach_command_post_wait (char *args, int from_tty, int async_exec)
 
 #ifdef ENABLE_PIP
 	  /* Search pip process after attach */
-          {
-	    char *new_exec_file;
+	    {
+	      char *new_exec_file;
 
-	    new_exec_file = xmalloc (MAXPATHLEN);
-	    make_cleanup (xfree, new_exec_file);
+	      new_exec_file = xmalloc (MAXPATHLEN);
+	      make_cleanup (xfree, new_exec_file);
 
-	    if (get_pip_process(PIDGET (inferior_ptid),
-                        new_exec_file, MAXPATHLEN, &pip_start_address) == 0)
-	      {
-	        char *new_full_exec_path = NULL;
-
-	        if (!source_full_path_of (new_exec_file, &new_full_exec_path))
-	          new_full_exec_path = xstrdup (new_exec_file);
-	        full_exec_path = new_full_exec_path;
-	        exec_file_attach (full_exec_path, from_tty);
-	      }
-          }
+	      if (get_pip_process(PIDGET (inferior_ptid),
+				  new_exec_file, MAXPATHLEN, &pip_start_address) == 0)
+		{
+		  xfree(full_exec_path);
+		  full_exec_path = new_exec_file;
+		  exec_file_attach (full_exec_path, from_tty);
+		}
+	      else
+		pip_start_address = 0;
+	    }
 #endif
 
 	  symbol_file_add_main (full_exec_path, from_tty);

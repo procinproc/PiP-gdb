@@ -1936,23 +1936,25 @@ about this file, refer to the manpage of core(5)."),
 
 #ifdef ENABLE_PIP
 struct pid_maps
-  {
-    ULONGEST start_addr;
-    ULONGEST end_addr;
-    const char *permissions;
-    size_t permissions_len;
-    ULONGEST offset;
-    const char *device;
-    size_t device_len;
-    ULONGEST inode;
-    const char *filename;
-  };
+{
+  ULONGEST start_addr;
+  ULONGEST end_addr;
+  const char *permissions;
+  size_t permissions_len;
+  ULONGEST offset;
+  const char *device;
+  size_t device_len;
+  ULONGEST inode;
+  const char *filename;
+};
 
 static FILE *get_pid_maps (pid_t pid)
 {
   char filename[100];
   FILE *fp;
-  xsnprintf (filename, sizeof filename, "/proc/%ld/maps", (long int)pid);
+
+  if (xsnprintf (filename, sizeof(filename), "/proc/%ld/maps", (long int)pid) < 0)
+    return NULL;
   fp = fopen(filename, "r");
   if (!fp)
     warning (_("unable to open /proc file '%ld'"), (long int)pid);
@@ -1967,13 +1969,14 @@ static int read_maps (char *line, size_t size, FILE *file, struct pid_maps *maps
     return 1;
 
   last_index = strlen(line) - 1;
-  if (last_index > 0 && line[last_index] == '\n')
-    line[last_index] = '\0';
+  if (last_index < 0 || line[last_index] != '\n')
+    return 1;
+  line[last_index] = '\0';
 
   read_mapping (line, &maps->start_addr, &maps->end_addr,
-    		&maps->permissions, &maps->permissions_len,
-    		&maps->offset, &maps->device, &maps->device_len,
-    		&maps->inode, &maps->filename);
+		&maps->permissions, &maps->permissions_len,
+		&maps->offset, &maps->device, &maps->device_len,
+		&maps->inode, &maps->filename);
 
   return 0;
 }
@@ -2001,15 +2004,15 @@ static int check_link_map (pid_t pid, const char *filename, CORE_ADDR addr)
   buf = bufstart = alloca (sect_size);
   if (!bfd_get_section_contents (abfd, sect, buf, 0, sect_size))
     {
-       bfd_close(abfd);
-       return 0;
+      bfd_close(abfd);
+      return 0;
     }
 
   arch_size = bfd_get_arch_size (abfd);
 
   /* Iterate over BUF and scan for DYNTAG.  If found, set PTR and return.  */
   step = (arch_size == 32) ?
-      sizeof (Elf32_External_Dyn) : sizeof (Elf64_External_Dyn);
+    sizeof (Elf32_External_Dyn) : sizeof (Elf64_External_Dyn);
   for (bufend = buf + sect_size; buf < bufend; buf += step)
     {
       long dyn_tag;
@@ -2017,31 +2020,31 @@ static int check_link_map (pid_t pid, const char *filename, CORE_ADDR addr)
       CORE_ADDR ptr_addr;
 
       if (arch_size == 32)
-        {
-          Elf32_External_Dyn *x_dynp_32;
-          x_dynp_32 = (Elf32_External_Dyn *) buf;
-          dyn_tag = bfd_h_get_32 (abfd, (bfd_byte *) x_dynp_32->d_tag);
-          dyn_ptr = bfd_h_get_32 (abfd, (bfd_byte *) x_dynp_32->d_un.d_ptr);
-        }
+	{
+	  Elf32_External_Dyn *x_dynp_32;
+	  x_dynp_32 = (Elf32_External_Dyn *) buf;
+	  dyn_tag = bfd_h_get_32 (abfd, (bfd_byte *) x_dynp_32->d_tag);
+	  dyn_ptr = bfd_h_get_32 (abfd, (bfd_byte *) x_dynp_32->d_un.d_ptr);
+	}
       else
-        {
-          Elf64_External_Dyn *x_dynp_64;
-          x_dynp_64 = (Elf64_External_Dyn *) buf;
-          dyn_tag = bfd_h_get_64 (abfd, (bfd_byte *) x_dynp_64->d_tag);
-          dyn_ptr = bfd_h_get_64 (abfd, (bfd_byte *) x_dynp_64->d_un.d_ptr);
-        }
+	{
+	  Elf64_External_Dyn *x_dynp_64;
+	  x_dynp_64 = (Elf64_External_Dyn *) buf;
+	  dyn_tag = bfd_h_get_64 (abfd, (bfd_byte *) x_dynp_64->d_tag);
+	  dyn_ptr = bfd_h_get_64 (abfd, (bfd_byte *) x_dynp_64->d_un.d_ptr);
+	}
 
-       if (dyn_tag != DT_DEBUG)
-         continue;
+      if (dyn_tag != DT_DEBUG)
+	continue;
 
-       /* Find DT_DEBUG.  */
-       ptr_type = builtin_type (target_gdbarch ())->builtin_data_ptr;
-       ptr_addr = addr + sect->vma + (buf - bufstart) + arch_size / 8;
-       if (target_read_memory (ptr_addr, ptr_buf, arch_size / 8) == 0)
-         dyn_ptr = extract_typed_address (ptr_buf, ptr_type);
-       if (linux_tdep_debug)
-         printf_unfiltered("dyn_ptr = %lx\n", (unsigned long)dyn_ptr);
-       break;
+      /* Find DT_DEBUG.  */
+      ptr_type = builtin_type (target_gdbarch ())->builtin_data_ptr;
+      ptr_addr = addr + sect->vma + (buf - bufstart) + arch_size / 8;
+      if (target_read_memory (ptr_addr, ptr_buf, arch_size / 8) == 0)
+	dyn_ptr = extract_typed_address (ptr_buf, ptr_type);
+      if (linux_tdep_debug)
+	printf_unfiltered("dyn_ptr = %lx\n", (unsigned long)dyn_ptr);
+      break;
     }
 
   bfd_close(abfd);
@@ -2059,8 +2062,6 @@ int get_pip_process (pid_t pid, char *dest_name, size_t size, ULONGEST *dest_add
   int ret = 1;
   struct pid_maps maps;
   volatile struct gdb_exception ex;
-
-  *dest_addr = 0;
 
   if (!check_pip (pid))
     return -1;
@@ -2082,16 +2083,15 @@ int get_pip_process (pid_t pid, char *dest_name, size_t size, ULONGEST *dest_add
     {
 
       if (strncmp (maps.permissions, "r-x", 3) == 0
-              && strlen(maps.filename) != 0
-              && strcmp(maps.filename, "[vdso]") != 0
-              && strcmp(maps.filename, "[vsyscall]") != 0
-              && check_link_map (pid, maps.filename, maps.start_addr))
-        {
-          *dest_addr = maps.start_addr;
-          xsnprintf (dest_name, size, "%s", maps.filename);
-          ret = 0;
-          break;
-        }
+	  && strlen(maps.filename) != 0
+	  && maps.filename[0] != '['
+	  && check_link_map (pid, maps.filename, maps.start_addr))
+	{
+	  *dest_addr = maps.start_addr;
+	  xsnprintf (dest_name, size, "%s", maps.filename);
+	  ret = 0;
+	  break;
+	}
     }
 
   fclose (file);
@@ -2112,12 +2112,12 @@ int found_pc_in_symbol (pid_t pid, ULONGEST addr)
   while (!read_maps(line, sizeof(line), file, &maps))
     {
       if (strncmp (maps.permissions, "r-x", 3) == 0
-              && addr == maps.start_addr
-              && maps.start_addr <= stop_pc && stop_pc <= maps.end_addr)
-        {
-          ret = 1;
-          break;
-        }
+	  && addr == maps.start_addr
+	  && maps.start_addr <= stop_pc && stop_pc < maps.end_addr)
+	{
+	  ret = 1;
+	  break;
+	}
     }
 
   fclose (file);
@@ -2141,10 +2141,10 @@ int check_pip (pid_t pid)
 
       str = strstr (maps.filename, "/libpip.so");
       if (str != NULL && strcmp (str, "/libpip.so") == 0)
-        {
-          ret = 1;
-          break;
-        }
+	{
+	  ret = 1;
+	  break;
+	}
     }
 
   fclose (file);
