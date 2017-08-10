@@ -15,6 +15,7 @@
 
 set binfile gdb.pip/gdb_test
 #set binfile gdb.pip/sleep
+set env(PIP_MODE) process:pipclone
 set rootpid [eval exec $binfile &]
 
 # The process must be spawned.
