@@ -44,3 +44,4 @@ gdb_test "detach" "process $rootpid.*"
 
 # The process must be exit.
 exec sleep 10
+exec kill $rootpid

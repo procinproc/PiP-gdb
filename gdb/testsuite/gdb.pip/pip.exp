@@ -66,3 +66,4 @@ gdb_test "detach" "process $taskpid.*"
 
 # The process must be exit.
 exec sleep 10
+exec kill $rootpid
