@@ -6,11 +6,13 @@ if [ -z $1 ]; then
 fi
 
 PIP_PREFIX=$1
+dynamic_linker=${PIP_PREFIX}/lib/ld-2.17.so
 
 if [ -n $2 ]; then
     if [ -x $2 ];
     then
-	LDLINUX=-Wl,--dynamic_linker=$2
+	dynamic_linker=$2
+	LDLINUX=-Wl,--dynamic-linker=$2
     else
 	echo '$2' is not LD-LINUX or unable to find
 	exit 1
@@ -31,7 +33,7 @@ find . -name config.cache -delete
 
 perl -i.relocatable -pe 's/^(D\[".*_RELOCATABLE"\]=" )1(")$/${1}0$2/' gdb/config.status
 
-make -j8 'CFLAGS=-O2 -g -pipe -Wall -Wp,-D_FORTIFY_SOURCE=2 -fexceptions -fstack-protector-strong --param=ssp-buffer-size=4 -grecord-gcc-switches -m64 -mtune=generic -DENABLE_PIP' "LDFLAGS=-Wl,-z,relro -Wl,--dynamic-linker=${PIP_PREFIX}/lib/ld-2.17.so -Wl,-rpath=${PIP_PREFIX}/lib"
+make -j8 'CFLAGS=-O2 -g -pipe -Wall -Wp,-D_FORTIFY_SOURCE=2 -fexceptions -fstack-protector-strong --param=ssp-buffer-size=4 -grecord-gcc-switches -m64 -mtune=generic -DENABLE_PIP' "LDFLAGS=-Wl,-z,relro -Wl,--dynamic-linker=$dynamic_linker -Wl,-rpath=${PIP_PREFIX}/lib"
 
 if [ -n ${PREFIX} ]; then
 make install
