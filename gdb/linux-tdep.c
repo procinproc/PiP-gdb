@@ -39,6 +39,9 @@
 #include <ctype.h>
 
 #ifdef ENABLE_PIP
+#include <pip.h>
+#include <pip_gdbif.h>
+
 #include "bfd.h"
 #include "symfile.h"
 #include "objfiles.h"
@@ -2149,5 +2152,227 @@ int check_pip (pid_t pid)
 
   fclose (file);
   return ret;
+}
+
+/*
+ * everytime <pip_gdbif.h> is updated, sizes and offsets of structs in
+ * pip_gdbif_task_info_read () and pip_gdbif_root_info_read () have to
+ * be updated.
+ * The reason why sizeof() and offsetof() aren't used here is to support
+ * cross-debugging in future.
+ *
+ * NOTE:
+ * - use PIP/util/pip_gdbif_offsets to see the sizes and offsets.
+ * - the offsets and sizes assumes that pip_spinlock_t is 32bit.
+ * - currently the offsets are for LP64 platform only.
+ * - TO-DO: support ILP32 platform.
+ */
+
+struct pip_gdbif_task_info {
+  CORE_ADDR pgt_addr;
+
+  CORE_ADDR pgt_next, pgt_prev;
+  CORE_ADDR pgt_root;
+  CORE_ADDR pgt_pathname;
+  int pgt_argc;
+  CORE_ADDR pgt_argv;
+  CORE_ADDR pgt_envv;;
+  CORE_ADDR pgt_handle;;
+  int pgt_pid;
+  int pgt_pipid;
+  int pgt_exit_code;
+  int pgt_exec_mode;
+  int pgt_status;
+  int pgt_gdb_status;
+};
+#define PIP_GDBIF_TASK_SIZE	96	/* XXX for LP64 platform only */
+
+static struct pip_gdbif_task_info *
+pip_gdbif_task_info_read (CORE_ADDR pgt_addr)
+{
+  gdb_byte *pgt;
+  struct pip_gdbif_task_info *pgt_info;
+  struct cleanup *back_to;
+
+  if (linux_tdep_debug)
+	  fprintf_unfiltered (gdb_stdlog, "PiP debug: <%s(%0lx)>\n",
+			      __func__, (long)pgt_addr);
+  pgt = xmalloc (PIP_GDBIF_TASK_SIZE);
+  back_to = make_cleanup (xfree, pgt);
+  
+  if (target_read_memory (pgt_addr, pgt, PIP_GDBIF_TASK_SIZE) != 0)
+    {
+      warning (_("Error reading PiP gdbif task entry at %s"),
+	       paddress (target_gdbarch (), pgt_addr)),
+      pgt_info = NULL;
+    }
+  else
+    {
+      struct type *ptr_type =
+	builtin_type (target_gdbarch ())->builtin_data_ptr;
+      enum bfd_endian byte_order = gdbarch_byte_order (target_gdbarch ());
+
+      pgt_info = xzalloc (sizeof (*pgt_info));
+      pgt_info->pgt_addr = pgt_addr;
+
+      /* XXX these offsets are for LP64 platform only. */
+      pgt_info->pgt_next = extract_typed_address (&pgt[0], ptr_type);
+      pgt_info->pgt_prev = extract_typed_address (&pgt[8], ptr_type);
+      pgt_info->pgt_root = extract_typed_address (&pgt[16], ptr_type);
+      pgt_info->pgt_pathname = extract_typed_address (&pgt[32], ptr_type);
+      pgt_info->pgt_argc = extract_signed_integer (&pgt[40], 4, byte_order);
+      pgt_info->pgt_argv = extract_typed_address (&pgt[48], ptr_type);
+      pgt_info->pgt_envv = extract_typed_address (&pgt[56], ptr_type);
+      pgt_info->pgt_handle = extract_typed_address (&pgt[64], ptr_type);
+      pgt_info->pgt_pid = extract_signed_integer (&pgt[72], 4, byte_order);
+      pgt_info->pgt_pipid = extract_signed_integer (&pgt[76], 4, byte_order);
+      pgt_info->pgt_exit_code =
+	extract_signed_integer (&pgt[80], 4, byte_order);
+      pgt_info->pgt_exec_mode =
+	extract_signed_integer (&pgt[84], 4, byte_order);
+      pgt_info->pgt_status = extract_signed_integer (&pgt[88], 4, byte_order);
+      pgt_info->pgt_gdb_status =
+	extract_signed_integer (&pgt[92], 4, byte_order);
+    }
+
+  do_cleanups (back_to);
+
+  return pgt_info;
+}
+
+struct pip_gdbif_root_info {
+  CORE_ADDR pgr_addr, pgr_task_root_addr;
+
+  CORE_ADDR pgr_hook_before_main;
+  CORE_ADDR pgr_hook_after_main;
+};
+#define PIP_GDBIF_ROOT_SIZE	136	/* XXX for LP64 platform only */
+
+static struct pip_gdbif_root_info *
+pip_gdbif_root_info_read (CORE_ADDR pgr_addr)
+{
+  gdb_byte *pgr;
+  struct pip_gdbif_root_info *pgr_info;
+  struct cleanup *back_to;
+
+  if (linux_tdep_debug)
+    fprintf_unfiltered (gdb_stdlog, "PiP debug: <%s(%0lx)>\n",
+			__func__, (long)pgr_addr);
+  pgr = xmalloc (PIP_GDBIF_ROOT_SIZE);
+  back_to = make_cleanup (xfree, pgr);
+  
+  if (target_read_memory (pgr_addr, pgr, PIP_GDBIF_ROOT_SIZE) != 0)
+    {
+      warning (_("Error reading PiP gdbif root entry at %s"),
+	       paddress (target_gdbarch (), pgr_addr)),
+      pgr_info = NULL;
+    }
+  else
+    {
+      struct type *ptr_type =
+	builtin_type (target_gdbarch ())->builtin_data_ptr;
+
+      pgr_info = xzalloc (sizeof (*pgr_info));
+      pgr_info->pgr_addr = pgr_addr;
+
+      /* XXX these offsets are for LP64 platform only. */
+      pgr_info->pgr_task_root_addr = pgr_addr + 40;
+      pgr_info->pgr_hook_before_main =
+	extract_typed_address (&pgr[0], ptr_type);
+      pgr_info->pgr_hook_after_main =
+	extract_typed_address (&pgr[8], ptr_type);
+    }
+
+  do_cleanups (back_to);
+
+  return pgr_info;
+
+}
+
+static struct pip_gdbif_root_info *
+pip_gdbif_root_read (void)
+{
+  struct type *ptr_type = builtin_type (target_gdbarch ())->builtin_data_ptr;
+  struct symbol *pip_gdbif_root_sym;
+  CORE_ADDR addr, pip_gdbif_root;
+  struct pip_gdbif_root_info *pgr_info;
+
+  if (linux_tdep_debug)
+    fprintf_unfiltered (gdb_stdlog, "PiP debug: <%s>\n", __func__);
+  pip_gdbif_root_sym =
+    lookup_symbol ("pip_gdbif_root", NULL, VAR_DOMAIN, NULL);
+  if (pip_gdbif_root_sym == 0)
+    {
+      /* pip_gdbif_root is available only in PiP root tasks */
+      if (linux_tdep_debug)
+	fprintf_unfiltered (gdb_stdlog,
+			    "PiP debug: symbol pip_gdbif_root not found.\n");
+      return NULL;
+    }
+  addr = SYMBOL_VALUE_ADDRESS (pip_gdbif_root_sym);
+  if (linux_tdep_debug)
+    fprintf_unfiltered (gdb_stdlog, "PiP debug: root addr=0x%lx\n",
+			(long)addr);
+
+  pip_gdbif_root = read_memory_typed_address (addr, ptr_type);
+  if (pip_gdbif_root == 0) {
+    /* pip_gdbif_root in PiP child tasks is NULL */
+    if (linux_tdep_debug)
+      fprintf_unfiltered (gdb_stdlog,
+			  "PiP debug: pip_gdbif_root is NULL.\n");
+    return NULL;
+  }
+
+  pgr_info = pip_gdbif_root_info_read (pip_gdbif_root);
+
+  return pgr_info;
+}
+
+static void
+pip_scan_inferiors (void)
+{
+  struct pip_gdbif_root_info *pgr_info = pip_gdbif_root_read ();
+  struct pip_gdbif_task_info *pgt_info;
+  CORE_ADDR pgt_addr;
+
+  if (pgr_info == NULL)
+    return;
+
+  pgt_addr = pgr_info->pgr_task_root_addr;
+  do {
+    pgt_info = pip_gdbif_task_info_read (pgt_addr);
+    if (pgt_info == NULL)
+      break;
+    if (linux_tdep_debug)
+      fprintf_unfiltered (gdb_stdlog, "PiP debug: pip_gdbif pid:%d pipid:%d\n",
+			  (int)pgt_info->pgt_pid, (int)pgt_info->pgt_pipid);
+
+    if (pgt_info->pgt_pipid != PIP_PIPID_ANY)
+      {
+	struct inferior *inf;
+
+	for (inf = inferior_list; inf; inf = inf->next)
+	  {
+	    if (linux_tdep_debug)
+	      fprintf_unfiltered (gdb_stdlog,
+				  "PiP debug: inferior pid:%d pipid:%d\n",
+				  (int)inf->pid, (int)inf->pipid);
+            if (inf->pid == pgt_info->pgt_pid)
+	      inf->pipid = pgt_info->pgt_pipid;
+	  }
+      }
+
+    pgt_addr = pgt_info->pgt_next;
+    xfree (pgt_info);
+  } while (pgt_addr != pgr_info->pgr_task_root_addr &&
+	   pgt_addr != 0 /* fail safe */);
+
+  xfree (pgr_info);
+}
+
+void
+linux_pip_scan (void)
+{
+  pip_scan_inferiors ();
 }
 #endif

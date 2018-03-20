@@ -37,13 +37,17 @@ struct type *linux_get_siginfo_type (struct gdbarch *);
 extern void linux_init_abi (struct gdbarch_info info, struct gdbarch *gdbarch);
 
 #ifdef ENABLE_PIP
+
 extern int get_pip_process (pid_t pid, char *dest_name, size_t size,
 			    ULONGEST *dest_addr);
 extern int found_pc_in_symbol (pid_t pid, ULONGEST addr);
 extern int check_pip (pid_t pid);
 
+extern void linux_pip_scan (void);
+
 /* Nonzero if exec_path is not same with /proc/PID/exe  */
 extern ULONGEST pip_start_address;
-#endif
+
+#endif /* ENABLE_PIP */
 
 #endif /* linux-tdep.h */

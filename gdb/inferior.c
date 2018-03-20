@@ -36,6 +36,13 @@
 #include "arch-utils.h"
 #include "target-descriptions.h"
 
+#ifdef ENABLE_PIP
+#include "linux-tdep.h" /* XXX TEMPORARY HACK linux_pip_scan () */
+
+#include <pip.h>
+#include <pip_gdbif.h>
+#endif
+
 void _initialize_inferiors (void);
 
 /* Keep a registry of per-inferior data-pointers required by other GDB
@@ -131,6 +138,10 @@ add_inferior_silent (int pid)
   inf = xmalloc (sizeof (*inf));
   memset (inf, 0, sizeof (*inf));
   inf->pid = pid;
+
+#ifdef ENABLE_PIP
+  inf->pipid = PIP_PIPID_ANY;
+#endif
 
   inf->control.stop_soon = NO_STOP_QUIETLY;
 
@@ -531,6 +542,24 @@ inferior_pid_to_str (int pid)
     return _("<null>");
 }
 
+#ifdef ENABLE_PIP
+static char *
+inferior_id_string (struct inferior *inf)
+{
+  static char buf[80];
+  char *pid_string = inferior_pid_to_str (inf->pid);
+
+  if (inf->pipid == PIP_PIPID_ANY)
+    return pid_string;
+
+  if (inf->pipid == PIP_PIPID_ROOT)
+    snprintf (buf, sizeof buf, "%s (pip root)", pid_string);
+  else
+    snprintf (buf, sizeof buf, "%s (pip %d)", pid_string, inf->pipid);
+  return buf;
+}
+#endif /* ENABLE_PIP */
+
 /* Prints the list of inferiors and their details on UIOUT.  This is a
    version of 'info_inferior_command' suitable for use from MI.
 
@@ -560,11 +589,18 @@ print_inferior (struct ui_out *uiout, char *requested_inferiors)
       return;
     }
 
+#ifdef ENABLE_PIP
+  linux_pip_scan (); /* XXX TEMPORARY HACK */
+#endif
   old_chain = make_cleanup_ui_out_table_begin_end (uiout, 4, inf_count,
 						   "inferiors");
   ui_out_table_header (uiout, 1, ui_left, "current", "");
   ui_out_table_header (uiout, 4, ui_left, "number", "Num");
+#ifdef ENABLE_PIP
+  ui_out_table_header (uiout, 24, ui_left, "target-id", "Description");
+#else
   ui_out_table_header (uiout, 17, ui_left, "target-id", "Description");
+#endif
   ui_out_table_header (uiout, 17, ui_left, "exec", "Executable");
 
   ui_out_table_body (uiout);
@@ -585,7 +621,11 @@ print_inferior (struct ui_out *uiout, char *requested_inferiors)
       ui_out_field_int (uiout, "number", inf->num);
 
       ui_out_field_string (uiout, "target-id",
+#ifdef ENABLE_PIP
+			   inferior_id_string (inf));
+#else
 			   inferior_pid_to_str (inf->pid));
+#endif
 
       if (inf->pspace->pspace_exec_filename != NULL)
 	ui_out_field_string (uiout, "exec", inf->pspace->pspace_exec_filename);
@@ -701,7 +741,11 @@ inferior_command (char *args, int from_tty)
 
   printf_filtered (_("[Switching to inferior %d [%s] (%s)]\n"),
 		   inf->num,
+#ifdef ENABLE_PIP
+		   inferior_id_string (inf),
+#else
 		   inferior_pid_to_str (inf->pid),
+#endif
 		   (inf->pspace->pspace_exec_filename != NULL
 		    ? inf->pspace->pspace_exec_filename
 		    : _("<noexec>")));
