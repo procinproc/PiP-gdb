@@ -2174,10 +2174,12 @@ struct pip_gdbif_task_info {
   CORE_ADDR pgt_next, pgt_prev;
   CORE_ADDR pgt_root;
   CORE_ADDR pgt_pathname;
+  CORE_ADDR pgt_realpathname;
   int pgt_argc;
   CORE_ADDR pgt_argv;
-  CORE_ADDR pgt_envv;;
-  CORE_ADDR pgt_handle;;
+  CORE_ADDR pgt_envv;
+  CORE_ADDR pgt_handle;
+  CORE_ADDR pgt_load_address;
   int pgt_pid;
   int pgt_pipid;
   int pgt_exit_code;
@@ -2185,7 +2187,7 @@ struct pip_gdbif_task_info {
   int pgt_status;
   int pgt_gdb_status;
 };
-#define PIP_GDBIF_TASK_SIZE	96	/* XXX for LP64 platform only */
+#define PIP_GDBIF_TASK_SIZE	112	/* XXX for LP64 platform only */
 
 static struct pip_gdbif_task_info *
 pip_gdbif_task_info_read (CORE_ADDR pgt_addr)
@@ -2220,19 +2222,21 @@ pip_gdbif_task_info_read (CORE_ADDR pgt_addr)
       pgt_info->pgt_prev = extract_typed_address (&pgt[8], ptr_type);
       pgt_info->pgt_root = extract_typed_address (&pgt[16], ptr_type);
       pgt_info->pgt_pathname = extract_typed_address (&pgt[32], ptr_type);
-      pgt_info->pgt_argc = extract_signed_integer (&pgt[40], 4, byte_order);
-      pgt_info->pgt_argv = extract_typed_address (&pgt[48], ptr_type);
-      pgt_info->pgt_envv = extract_typed_address (&pgt[56], ptr_type);
-      pgt_info->pgt_handle = extract_typed_address (&pgt[64], ptr_type);
-      pgt_info->pgt_pid = extract_signed_integer (&pgt[72], 4, byte_order);
-      pgt_info->pgt_pipid = extract_signed_integer (&pgt[76], 4, byte_order);
+      pgt_info->pgt_realpathname = extract_typed_address (&pgt[40], ptr_type);
+      pgt_info->pgt_argc = extract_signed_integer (&pgt[48], 4, byte_order);
+      pgt_info->pgt_argv = extract_typed_address (&pgt[56], ptr_type);
+      pgt_info->pgt_envv = extract_typed_address (&pgt[64], ptr_type);
+      pgt_info->pgt_handle = extract_typed_address (&pgt[72], ptr_type);
+      pgt_info->pgt_load_address = extract_typed_address (&pgt[80], ptr_type);
+      pgt_info->pgt_pid = extract_signed_integer (&pgt[88], 4, byte_order);
+      pgt_info->pgt_pipid = extract_signed_integer (&pgt[92], 4, byte_order);
       pgt_info->pgt_exit_code =
-	extract_signed_integer (&pgt[80], 4, byte_order);
+	extract_signed_integer (&pgt[96], 4, byte_order);
       pgt_info->pgt_exec_mode =
-	extract_signed_integer (&pgt[84], 4, byte_order);
-      pgt_info->pgt_status = extract_signed_integer (&pgt[88], 4, byte_order);
+	extract_signed_integer (&pgt[100], 4, byte_order);
+      pgt_info->pgt_status = extract_signed_integer (&pgt[104], 4, byte_order);
       pgt_info->pgt_gdb_status =
-	extract_signed_integer (&pgt[92], 4, byte_order);
+	extract_signed_integer (&pgt[108], 4, byte_order);
     }
 
   do_cleanups (back_to);
@@ -2246,7 +2250,7 @@ struct pip_gdbif_root_info {
   CORE_ADDR pgr_hook_before_main;
   CORE_ADDR pgr_hook_after_main;
 };
-#define PIP_GDBIF_ROOT_SIZE	136	/* XXX for LP64 platform only */
+#define PIP_GDBIF_ROOT_SIZE	152	/* XXX for LP64 platform only */
 
 static struct pip_gdbif_root_info *
 pip_gdbif_root_info_read (CORE_ADDR pgr_addr)
