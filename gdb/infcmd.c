@@ -58,11 +58,6 @@
 #include "linespec.h"
 #include "cli/cli-utils.h"
 
-#ifdef ENABLE_PIP
-#include "linux-tdep.h"
-#include <sys/param.h>		/* for MAXPATHLEN */
-#endif
-
 /* Local functions: */
 
 static void nofp_registers_info (char *, int);
@@ -2450,27 +2445,6 @@ attach_command_post_wait (char *args, int from_tty, int async_exec)
 	    full_exec_path = xstrdup (exec_file);
 
 	  exec_file_attach (full_exec_path, from_tty);
-
-#if 0 /*#ifdef ENABLE_PIP*/
-	  /* Search pip process after attach */
-	    {
-	      char *new_exec_file;
-
-	      new_exec_file = xmalloc (MAXPATHLEN);
-	      make_cleanup (xfree, new_exec_file);
-
-	      if (get_pip_process(PIDGET (inferior_ptid),
-				  new_exec_file, MAXPATHLEN, &pip_start_address) == 0)
-		{
-		  xfree(full_exec_path);
-		  full_exec_path = new_exec_file;
-		  exec_file_attach (full_exec_path, from_tty);
-		}
-	      else
-		pip_start_address = 0;
-	    }
-#endif
-
 	  symbol_file_add_main (full_exec_path, from_tty);
 	}
     }

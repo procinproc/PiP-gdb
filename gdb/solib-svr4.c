@@ -2847,11 +2847,6 @@ svr4_relocate_main_executable (void)
        - The section offsets were not reset earlier, and the best we can
 	 hope is that the old offsets are still applicable to the new run.  */
 
-#ifdef ENABLE_PIP
-  if (pip_start_address != 0)
-    displacement = pip_start_address;
-  else
-#endif
   if (! svr4_exec_displacement (&displacement))
     return;
 
@@ -2965,7 +2960,7 @@ svr4_relocate_main_executable (void)
 
 	}
     }
-#endif
+#endif /* ENABLE_PIP */
 }
 
 /* Implement the "create_inferior_hook" target_solib_ops method.
@@ -3242,56 +3237,3 @@ _initialize_svr4_solib (void)
   svr4_so_ops.update_breakpoints = svr4_update_solib_event_breakpoints;
   svr4_so_ops.handle_event = svr4_handle_solib_event;
 }
-
-#ifdef ENABLE_PIP
-int svr4_check_link_map (pid_t pid, CORE_ADDR dyn_ptr)
-{
-  struct lm_info *lm_info;
-  CORE_ADDR lm;
-  CORE_ADDR r_map = 0;
-  struct link_map_offsets *lmo = svr4_fetch_link_map_offsets ();
-  struct type *ptr_type = builtin_type (target_gdbarch ())->builtin_data_ptr;
-
-  r_map = read_memory_typed_address (dyn_ptr + lmo->r_map_offset, ptr_type);
-  if (!r_map)
-    return 0;
-
-  lm_info = lm_info_read(r_map);
-  if (!lm_info)
-    return 0;
-  lm = lm_info->lm_addr;
-
-  for (; lm != 0; lm = lm_info->l_next)
-    {
-      lm_info = lm_info_read (lm);
-
-      if (svr4_debug)
-	{
-	  char *buffer;
-	  int errcode;
-
-	  /* Extract this shared object's name.  */
-	  target_read_string (lm_info->l_name, &buffer,
-			      SO_NAME_MAX_PATH_SIZE - 1, &errcode);
-	  if (errcode != 0)
-	    warning (_("Can't read pathname for load map: %s."),
-		     safe_strerror (errcode));
-
-	  printf_unfiltered("name = %s\n", buffer);
-	  printf_unfiltered("lm_addr = %lx\n",
-			    (unsigned long)lm_info->lm_addr);
-	  printf_unfiltered("l_ld = %lx\n",
-			    (unsigned long)lm_info->l_ld);
-	  printf_unfiltered("l_addr = %lx\n",
-			    (unsigned long)lm_info->l_addr);
-	  printf_unfiltered("l_addr_inferior = %lx\n",
-			    (unsigned long)lm_info->l_addr_inferior);
-	  xfree (buffer);
-	}
-
-      if (found_pc_in_symbol(pid, lm_info->l_addr_inferior))
-	return 1;
-    }
-  return 0;
-}
-#endif
