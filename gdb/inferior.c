@@ -39,7 +39,6 @@
 #ifdef ENABLE_PIP
 #include "linux-tdep.h" /* XXX TEMPORARY HACK linux_pip_scan () */
 
-#include <pip.h>
 #include <pip_gdbif.h>
 #endif
 
@@ -140,7 +139,9 @@ add_inferior_silent (int pid)
   inf->pid = pid;
 
 #ifdef ENABLE_PIP
-  inf->pipid = PIP_PIPID_ANY;
+  inf->pipid = PIP_GDBIF_PIPID_ANY;
+  inf->pip_load_address = 0;
+  inf->pip_pathname = NULL;
 #endif
 
   inf->control.stop_soon = NO_STOP_QUIETLY;
@@ -549,10 +550,10 @@ inferior_id_string (struct inferior *inf)
   static char buf[80];
   char *pid_string = inferior_pid_to_str (inf->pid);
 
-  if (inf->pipid == PIP_PIPID_ANY)
+  if (inf->pipid == PIP_GDBIF_PIPID_ANY)
     return pid_string;
 
-  if (inf->pipid == PIP_PIPID_ROOT)
+  if (inf->pipid == PIP_GDBIF_PIPID_ROOT)
     snprintf (buf, sizeof buf, "%s (pip root)", pid_string);
   else
     snprintf (buf, sizeof buf, "%s (pip %d)", pid_string, inf->pipid);
@@ -590,7 +591,7 @@ print_inferior (struct ui_out *uiout, char *requested_inferiors)
     }
 
 #ifdef ENABLE_PIP
-  linux_pip_scan (); /* XXX TEMPORARY HACK */
+  (void) linux_pip_scan (); /* XXX TEMPORARY HACK */
 #endif
   old_chain = make_cleanup_ui_out_table_begin_end (uiout, 4, inf_count,
 						   "inferiors");

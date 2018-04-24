@@ -2451,7 +2451,7 @@ attach_command_post_wait (char *args, int from_tty, int async_exec)
 
 	  exec_file_attach (full_exec_path, from_tty);
 
-#ifdef ENABLE_PIP
+#if 0 /*#ifdef ENABLE_PIP*/
 	  /* Search pip process after attach */
 	    {
 	      char *new_exec_file;

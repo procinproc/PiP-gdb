@@ -54,6 +54,9 @@ static void svr4_relocate_main_executable (void);
 static void svr4_free_library_list (void *p_list);
 
 #ifdef ENABLE_PIP
+#include <pip_gdbif.h>
+
+#include "target-descriptions.h"
 #include "linux-tdep.h"
 static unsigned int svr4_debug = 0;
 #endif
@@ -2877,6 +2880,92 @@ svr4_relocate_main_executable (void)
 				  (bfd_section_vma (exec_bfd, asect)
 				   + displacement));
     }
+
+#ifdef ENABLE_PIP
+  /*
+   * need to call solib_add () to resolve the symbol of the PiP parent task.
+   * note that solibs of the parent task are already loaded in case of PiP.
+   */
+  solib_add (NULL, 0, &current_target, auto_solib_add);
+
+  if (!linux_pip_scan ())
+    {
+      if (svr4_debug)
+	printf_unfiltered ("linux_pip_scan () -> FAIL\n");
+    }
+  else
+    {
+      struct inferior *inf = current_inferior ();
+
+      if (svr4_debug)
+	printf_unfiltered ("linux_pip_scan() succeed, inf = %p\n", inf);
+      if (inf != NULL &&
+	  inf->pipid != PIP_GDBIF_PIPID_ANY &&
+	  inf->pipid != PIP_GDBIF_PIPID_ROOT)
+	{
+	  CORE_ADDR new_displacement = inf->pip_load_address;
+	  struct svr4_info *info;
+
+	  if (svr4_debug)
+	    printf_unfiltered ("PIPID: %d, prog:%s, displacement:0x%lx\n",
+			       inf->pipid, inf->pip_pathname,
+			       (long)inf->pip_load_address);
+
+	  /* undo solib_add () above */
+	  no_shared_libraries (NULL, 0);
+
+	  /*
+	   * from follow_exec ()
+	   */
+	  target_clear_description ();
+	  exec_file_attach (inf->pip_pathname, 0);
+	  symbol_file_add (inf->pip_pathname,
+			   (inf->symfile_flags
+			    | SYMFILE_MAINLINE | SYMFILE_DEFER_BP_RESET),
+			   NULL, 0);
+	  if ((inf->symfile_flags & SYMFILE_NO_READ) == 0)
+	    set_initial_language ();
+	  target_find_description ();
+
+	  /*
+	   * from svr4_solib_create_inferior_hook ()
+	   */
+	  info = get_svr4_info ();
+	  /* Clear the probes-based interface's state.  */
+	  free_probes_table (info);
+	  free_solib_list (info);
+
+	  /*
+	   * from first half of svr4_relocate_main_executable ()
+	   */
+	  if (symfile_objfile)
+	    {
+	      struct section_offsets *new_offsets;
+	      int i;
+
+	      new_offsets = alloca (symfile_objfile->num_sections
+				    * sizeof (*new_offsets));
+
+	      for (i = 0; i < symfile_objfile->num_sections; i++)
+		new_offsets->offsets[i] = new_displacement;
+
+	      objfile_relocate (symfile_objfile, new_offsets);
+	    }
+	  else if (exec_bfd)
+	    {
+	      asection *asect;
+
+	      for (asect = exec_bfd->sections; asect != NULL;
+		   asect = asect->next)
+		exec_set_section_address (bfd_get_filename (exec_bfd),
+					  asect->index,
+					  (bfd_section_vma (exec_bfd, asect)
+					   + new_displacement));
+	    }
+
+	}
+    }
+#endif
 }
 
 /* Implement the "create_inferior_hook" target_solib_ops method.

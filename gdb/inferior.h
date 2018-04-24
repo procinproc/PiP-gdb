@@ -422,6 +422,8 @@ struct inferior
 
 #ifdef ENABLE_PIP
   int pipid;
+  CORE_ADDR pip_load_address;
+  char *pip_pathname;
 #endif
 
   /* State of GDB control of inferior process execution.

@@ -43,7 +43,7 @@ extern int get_pip_process (pid_t pid, char *dest_name, size_t size,
 extern int found_pc_in_symbol (pid_t pid, ULONGEST addr);
 extern int check_pip (pid_t pid);
 
-extern void linux_pip_scan (void);
+extern int linux_pip_scan (void);
 
 /* Nonzero if exec_path is not same with /proc/PID/exe  */
 extern ULONGEST pip_start_address;

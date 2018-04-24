@@ -39,7 +39,6 @@
 #include <ctype.h>
 
 #ifdef ENABLE_PIP
-#include <pip.h>
 #include <pip_gdbif.h>
 
 #include "bfd.h"
@@ -2297,14 +2296,14 @@ static struct pip_gdbif_root_info *
 pip_gdbif_root_read (void)
 {
   struct type *ptr_type = builtin_type (target_gdbarch ())->builtin_data_ptr;
-  struct symbol *pip_gdbif_root_sym;
+  struct minimal_symbol *pip_gdbif_root_sym;
   CORE_ADDR addr, pip_gdbif_root;
   struct pip_gdbif_root_info *pgr_info;
 
   if (linux_tdep_debug)
     fprintf_unfiltered (gdb_stdlog, "PiP debug: <%s>\n", __func__);
   pip_gdbif_root_sym =
-    lookup_symbol ("pip_gdbif_root", NULL, VAR_DOMAIN, NULL);
+    lookup_minimal_symbol ("pip_gdbif_root", NULL, NULL);
   if (pip_gdbif_root_sym == 0)
     {
       /* pip_gdbif_root is available only in PiP root tasks */
@@ -2332,7 +2331,7 @@ pip_gdbif_root_read (void)
   return pgr_info;
 }
 
-static void
+static int
 pip_scan_inferiors (void)
 {
   struct pip_gdbif_root_info *pgr_info = pip_gdbif_root_read ();
@@ -2340,7 +2339,7 @@ pip_scan_inferiors (void)
   CORE_ADDR pgt_addr;
 
   if (pgr_info == NULL)
-    return;
+    return 0;
 
   pgt_addr = pgr_info->pgr_task_root_addr;
   do {
@@ -2351,7 +2350,7 @@ pip_scan_inferiors (void)
       fprintf_unfiltered (gdb_stdlog, "PiP debug: pip_gdbif pid:%d pipid:%d\n",
 			  (int)pgt_info->pgt_pid, (int)pgt_info->pgt_pipid);
 
-    if (pgt_info->pgt_pipid != PIP_PIPID_ANY)
+    if (pgt_info->pgt_pipid != PIP_GDBIF_PIPID_ANY)
       {
 	struct inferior *inf;
 
@@ -2361,8 +2360,31 @@ pip_scan_inferiors (void)
 	      fprintf_unfiltered (gdb_stdlog,
 				  "PiP debug: inferior pid:%d pipid:%d\n",
 				  (int)inf->pid, (int)inf->pipid);
+
             if (inf->pid == pgt_info->pgt_pid)
-	      inf->pipid = pgt_info->pgt_pipid;
+	      {
+		/* not initialized yet? */
+		if (inf->pipid == PIP_GDBIF_PIPID_ANY)
+		  {
+		    inf->pipid = pgt_info->pgt_pipid;
+		    if (inf->pipid != PIP_GDBIF_PIPID_ROOT)
+		      {
+			int errcode;
+			
+			inf->pip_load_address = pgt_info->pgt_load_address;
+			target_read_string (pgt_info->pgt_realpathname,
+					    &inf->pip_pathname, PATH_MAX - 1,
+					    &errcode);
+			if (errcode)
+			  {
+			    warning (_("failed to read exec filename of "
+				       "PiP task %d: %s"),
+				     inf->pipid, safe_strerror (errcode));
+			    inf->pip_pathname = NULL;
+			  }
+		      }
+		  }
+	      }
 	  }
       }
 
@@ -2372,11 +2394,12 @@ pip_scan_inferiors (void)
 	   pgt_addr != 0 /* fail safe */);
 
   xfree (pgr_info);
+  return 1;
 }
 
-void
+int
 linux_pip_scan (void)
 {
-  pip_scan_inferiors ();
+  return pip_scan_inferiors ();
 }
 #endif
