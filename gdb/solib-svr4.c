@@ -58,8 +58,12 @@ static void svr4_free_library_list (void *p_list);
 
 #include "target-descriptions.h"
 #include "linux-tdep.h"
+#include "gdbcmd.h"
+
 static unsigned int svr4_debug = 0;
-#endif
+
+static int pip_auto_attach = 0;
+#endif /* ENABLE_PIP */
 
 /* Link map info to include in an allocated so_list entry.  */
 
@@ -2449,6 +2453,48 @@ read_program_headers_from_bfd (bfd *abfd, int *phdrs_size)
   return buf;
 }
 
+#ifdef ENABLE_PIP
+static void
+attach_pid (int pid)
+{
+  struct inferior *inf = add_inferior_with_spaces ();
+  char pidarg[30];
+
+  printf_filtered (_("Added inferior %d\n"), inf->num);
+  set_current_inferior (inf);
+  switch_to_thread (null_ptid);
+  set_current_program_space (inf->pspace);
+
+  snprintf(pidarg, sizeof pidarg, "%d", pid);
+  catch_command_errors (attach_command, pidarg, 0, RETURN_MASK_ALL);
+}
+
+static int attach_pip_tasks_is_running = 0;
+
+static void
+attach_pip_tasks_completed (void *dummy)
+{
+  attach_pip_tasks_is_running = 0;
+}
+
+static void
+attach_pip_tasks (void)
+{
+  struct cleanup *old_chain;
+
+  if (attach_pip_tasks_is_running)
+    return;
+  make_cleanup (attach_pip_tasks_completed, NULL);
+  attach_pip_tasks_is_running = 1;
+
+  old_chain = save_current_space_and_thread ();
+
+  unattached_pip_task_list_foreach (attach_pid);
+
+  do_cleanups (old_chain);
+}
+#endif /* ENABLE_PIP */
+
 /* Return 1 and fill *DISPLACEMENTP with detected PIE offset of inferior
    exec_bfd.  Otherwise return 0.
 
@@ -2959,6 +3005,7 @@ svr4_relocate_main_executable (void)
 	    }
 
 	}
+      attach_pip_tasks();
     }
 #endif /* ENABLE_PIP */
 }
@@ -3236,4 +3283,12 @@ _initialize_svr4_solib (void)
   svr4_so_ops.keep_data_in_core = svr4_keep_data_in_core;
   svr4_so_ops.update_breakpoints = svr4_update_solib_event_breakpoints;
   svr4_so_ops.handle_event = svr4_handle_solib_event;
+
+#ifdef ENABLE_PIP
+  add_setshow_boolean_cmd ("pip-auto-attach", class_run, &pip_auto_attach, _("\
+Set whether gdb will attach the child PiP tasks."), _("\
+Show whether gdb will attach the child PiP tasks."), _("\
+Tells gdb whether to attach the child PiP tasks."),
+			   NULL, NULL, &setlist, &showlist);
+#endif
 }

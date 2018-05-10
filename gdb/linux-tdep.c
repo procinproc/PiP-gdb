@@ -2108,6 +2108,85 @@ pip_gdbif_root_read (void)
   return pgr_info;
 }
 
+struct unattached_pip_task {
+  struct unattached_pip_task *next;
+  int pid;
+};
+
+static struct unattached_pip_task *unattached_pip_task_list = NULL;
+
+static void
+unattached_pip_task_list_free (void *p)
+{
+  struct unattached_pip_task *list = p;
+  struct unattached_pip_task *task, *next;
+
+  for (task = list; task != NULL; task = next)
+    {
+      next = task->next;
+      xfree (task);
+    }
+}
+
+static void
+unattached_pip_task_list_clear (void *dummy)
+{
+  unattached_pip_task_list_free (unattached_pip_task_list);
+  unattached_pip_task_list = NULL;
+}
+
+static void
+unattached_pip_task_list_add (int pid)
+{
+  struct unattached_pip_task *task = xmalloc (sizeof (*task));
+
+  if (task == NULL)
+    {
+      printf_unfiltered ("cannot allocate memory "
+			 "for unatached PiP task pid:%d\n", pid);
+      return;
+    }
+  task->pid = pid;
+  task->next = unattached_pip_task_list;
+  unattached_pip_task_list = task;
+}
+
+void
+unattached_pip_task_list_foreach (void (*doit)(int))
+{
+  struct unattached_pip_task *list = NULL, *task, *entry;
+  struct cleanup *old_chain =
+    make_cleanup (unattached_pip_task_list_clear, NULL);
+
+  /*
+   * copy unattached_pip_task_list to `list' at first,
+   * because unattached_pip_task_list will be broken by (*doit)().
+   */
+  for (task = unattached_pip_task_list; task != NULL; task = task->next)
+    {
+      entry  = xmalloc (sizeof (*entry));
+      if (entry == NULL)
+	{
+	  printf_unfiltered ("cannot allocate memory "
+			     "for unattached_pip_task_list_foreach\n");
+	  unattached_pip_task_list_free (list);
+	  do_cleanups (old_chain);
+	  return;
+	}
+      entry->pid = task->pid;
+      entry->next = list;
+      list = entry;
+    }
+
+  make_cleanup (unattached_pip_task_list_free, list);
+
+  /* then call (*doit) () */
+  for (entry = list; entry != NULL; entry = entry->next)
+    (*doit) (entry->pid);
+
+  do_cleanups (old_chain);
+}
+
 static int
 pip_scan_inferiors (void)
 {
@@ -2117,6 +2196,8 @@ pip_scan_inferiors (void)
 
   if (pgr_info == NULL)
     return 0;
+
+  unattached_pip_task_list_clear (NULL);
 
   pgt_addr = pgr_info->pgr_task_root_addr;
   do {
@@ -2130,6 +2211,7 @@ pip_scan_inferiors (void)
     if (pgt_info->pgt_pipid != PIP_GDBIF_PIPID_ANY)
       {
 	struct inferior *inf;
+	int already_attached = 0;
 
 	for (inf = inferior_list; inf; inf = inf->next)
 	  {
@@ -2140,6 +2222,8 @@ pip_scan_inferiors (void)
 
             if (inf->pid == pgt_info->pgt_pid)
 	      {
+		already_attached = 1;
+
 		/* not initialized yet? */
 		if (inf->pipid == PIP_GDBIF_PIPID_ANY)
 		  {
@@ -2163,6 +2247,8 @@ pip_scan_inferiors (void)
 		  }
 	      }
 	  }
+	if (!already_attached)
+	  unattached_pip_task_list_add (pgt_info->pgt_pid);
       }
 
     pgt_addr = pgt_info->pgt_next;
