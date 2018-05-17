@@ -45,21 +45,24 @@ gdb_test "list" "#endif.*"
 gdb_test "backtrace" "main ().*"
 
 # breakpoint test.
-gdb_test "break foo" "Breakpoint .* at .*: foo..*"
+gdb_test "break foo" "Breakpoint 1 at .*: file sleep.c,.*" "break 1"
 
 # delete test.
 gdb_test "delete 1" ""
 gdb_test "info breakpoints" "No breakpoints or watchpoints."
-gdb_test "break foo" "Breakpoint .* at .*: foo..*"
+gdb_test "break foo" "Breakpoint 2 at .*: file sleep.c,.*" "break 2"
 
 # continue test.
 gdb_test "continue" "Continuing.*"
 
 # next test.
-gdb_test "next" "printf(.*).*" "next1"
+gdb_test "next" "printf\\(\"Bar.*" "next1"
 gdb_test "next" "}.*" "next2"
-gdb_test "next" "in ?? ().*" "next3"
-gdb_test "next" "Cannot find bounds of current function" "next4"
+gdb_test "next" "printf\\(\"Done.*" "next3"
+gdb_test "next" "return 0;.*" "next4"
+gdb_test "next" "}.*" "next5"
+gdb_test "next" "in \\?\\? \\(\\).*" "next6"
+gdb_test "next" "Cannot find bounds of current function" "next7"
 
 # Detach test.
 gdb_test "detach" "process $taskpid.*"
