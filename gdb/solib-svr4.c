@@ -3005,7 +3005,8 @@ svr4_relocate_main_executable (void)
 	    }
 
 	}
-      attach_pip_tasks();
+      if (pip_auto_attach)
+	attach_pip_tasks();
     }
 #endif /* ENABLE_PIP */
 }
