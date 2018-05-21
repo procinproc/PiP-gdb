@@ -31,6 +31,8 @@ set test "attach to PIP task"
 gdb_exit
 gdb_start
 
+gdb_test "set pip-auto-attach on" ""
+
 # Attach test.
 gdb_test "attach ${taskpid}" ".*Attaching to process $taskpid.*"
 
@@ -43,6 +45,15 @@ gdb_test "list" "#endif.*"
 
 # backtrace test.
 gdb_test "backtrace" "main ().*"
+
+# "info inferiors" test
+gdb_test "info inferiors" "2 .* process .* \\(pip root\\) .*/gdb\\.pip/gdb_test.*"
+
+# switching inferior test 1
+gdb_test "inferior 2" "Switching to inferior 2 .* \\(pip root\\).*/gdb\\.pip/gdb_test.*"
+
+# switching inferior test 2
+gdb_test "inferior 1" "Switching to inferior 1 .* \\(pip 0\\).*/gdb\\.pip/sleep.*"
 
 # breakpoint test.
 gdb_test "break foo" "Breakpoint 1 at .*: file sleep.c,.*" "break 1"
@@ -66,6 +77,9 @@ gdb_test "next" "Cannot find bounds of current function" "next7"
 
 # Detach test.
 gdb_test "detach" "process $taskpid.*"
+
+# switching inferior test 3
+gdb_test "inferior 2" "Switching to inferior 2 .* \\(pip root\\).*/gdb\\.pip/gdb_test.*" "inferior 2 - 2"
 
 # The process must be exit.
 exec sleep 10
