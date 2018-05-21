@@ -37,7 +37,7 @@
 #include "target-descriptions.h"
 
 #ifdef ENABLE_PIP
-#include "linux-tdep.h" /* XXX TEMPORARY HACK linux_pip_scan () */
+#include "solib-svr4.h" /* pip_scan_inferiors () */
 
 #include <pip_gdbif.h>
 #endif
@@ -591,7 +591,10 @@ print_inferior (struct ui_out *uiout, char *requested_inferiors)
     }
 
 #ifdef ENABLE_PIP
-  (void) linux_pip_scan (); /* XXX TEMPORARY HACK */
+  /*
+   * invoking "info inferiors" at PiP root task updates PiP task lists
+   */
+  (void) pip_scan_inferiors ();
 #endif
   old_chain = make_cleanup_ui_out_table_begin_end (uiout, 4, inf_count,
 						   "inferiors");

@@ -57,7 +57,6 @@ static void svr4_free_library_list (void *p_list);
 #include <pip_gdbif.h>
 
 #include "target-descriptions.h"
-#include "linux-tdep.h"
 #include "gdbcmd.h"
 
 static unsigned int svr4_debug = 0;
@@ -2454,6 +2453,336 @@ read_program_headers_from_bfd (bfd *abfd, int *phdrs_size)
 }
 
 #ifdef ENABLE_PIP
+/*
+ * everytime <pip_gdbif.h> is updated, sizes and offsets of structs in
+ * pip_gdbif_task_info_read () and pip_gdbif_root_info_read () have to
+ * be updated.
+ * The reason why sizeof() and offsetof() aren't used here is to support
+ * cross-debugging in future.
+ *
+ * NOTE:
+ * - use PIP/util/pip_gdbif_offsets to see the sizes and offsets.
+ * - the offsets and sizes assumes that pip_spinlock_t is 32bit.
+ * - currently the offsets are for LP64 platform only.
+ * - TO-DO: support ILP32 platform.
+ */
+
+struct pip_gdbif_task_info {
+  CORE_ADDR pgt_addr;
+
+  CORE_ADDR pgt_next, pgt_prev;
+  CORE_ADDR pgt_root;
+  CORE_ADDR pgt_pathname;
+  CORE_ADDR pgt_realpathname;
+  int pgt_argc;
+  CORE_ADDR pgt_argv;
+  CORE_ADDR pgt_envv;
+  CORE_ADDR pgt_handle;
+  CORE_ADDR pgt_load_address;
+  int pgt_pid;
+  int pgt_pipid;
+  int pgt_exit_code;
+  int pgt_exec_mode;
+  int pgt_status;
+  int pgt_gdb_status;
+};
+#define PIP_GDBIF_TASK_SIZE	112	/* XXX for LP64 platform only */
+
+static struct pip_gdbif_task_info *
+pip_gdbif_task_info_read (CORE_ADDR pgt_addr)
+{
+  gdb_byte *pgt;
+  struct pip_gdbif_task_info *pgt_info;
+  struct cleanup *back_to;
+
+  if (svr4_debug)
+	  fprintf_unfiltered (gdb_stdlog, "PiP debug: <%s(%0lx)>\n",
+			      __func__, (long)pgt_addr);
+  pgt = xmalloc (PIP_GDBIF_TASK_SIZE);
+  back_to = make_cleanup (xfree, pgt);
+  
+  if (target_read_memory (pgt_addr, pgt, PIP_GDBIF_TASK_SIZE) != 0)
+    {
+      warning (_("Error reading PiP gdbif task entry at %s"),
+	       paddress (target_gdbarch (), pgt_addr)),
+      pgt_info = NULL;
+    }
+  else
+    {
+      struct type *ptr_type =
+	builtin_type (target_gdbarch ())->builtin_data_ptr;
+      enum bfd_endian byte_order = gdbarch_byte_order (target_gdbarch ());
+
+      pgt_info = xzalloc (sizeof (*pgt_info));
+      pgt_info->pgt_addr = pgt_addr;
+
+      /* XXX these offsets are for LP64 platform only. */
+      pgt_info->pgt_next = extract_typed_address (&pgt[0], ptr_type);
+      pgt_info->pgt_prev = extract_typed_address (&pgt[8], ptr_type);
+      pgt_info->pgt_root = extract_typed_address (&pgt[16], ptr_type);
+      pgt_info->pgt_pathname = extract_typed_address (&pgt[32], ptr_type);
+      pgt_info->pgt_realpathname = extract_typed_address (&pgt[40], ptr_type);
+      pgt_info->pgt_argc = extract_signed_integer (&pgt[48], 4, byte_order);
+      pgt_info->pgt_argv = extract_typed_address (&pgt[56], ptr_type);
+      pgt_info->pgt_envv = extract_typed_address (&pgt[64], ptr_type);
+      pgt_info->pgt_handle = extract_typed_address (&pgt[72], ptr_type);
+      pgt_info->pgt_load_address = extract_typed_address (&pgt[80], ptr_type);
+      pgt_info->pgt_pid = extract_signed_integer (&pgt[88], 4, byte_order);
+      pgt_info->pgt_pipid = extract_signed_integer (&pgt[92], 4, byte_order);
+      pgt_info->pgt_exit_code =
+	extract_signed_integer (&pgt[96], 4, byte_order);
+      pgt_info->pgt_exec_mode =
+	extract_signed_integer (&pgt[100], 4, byte_order);
+      pgt_info->pgt_status = extract_signed_integer (&pgt[104], 4, byte_order);
+      pgt_info->pgt_gdb_status =
+	extract_signed_integer (&pgt[108], 4, byte_order);
+    }
+
+  do_cleanups (back_to);
+
+  return pgt_info;
+}
+
+struct pip_gdbif_root_info {
+  CORE_ADDR pgr_addr, pgr_task_root_addr;
+
+  CORE_ADDR pgr_hook_before_main;
+  CORE_ADDR pgr_hook_after_main;
+};
+#define PIP_GDBIF_ROOT_SIZE	152	/* XXX for LP64 platform only */
+
+static struct pip_gdbif_root_info *
+pip_gdbif_root_info_read (CORE_ADDR pgr_addr)
+{
+  gdb_byte *pgr;
+  struct pip_gdbif_root_info *pgr_info;
+  struct cleanup *back_to;
+
+  if (svr4_debug)
+    fprintf_unfiltered (gdb_stdlog, "PiP debug: <%s(%0lx)>\n",
+			__func__, (long)pgr_addr);
+  pgr = xmalloc (PIP_GDBIF_ROOT_SIZE);
+  back_to = make_cleanup (xfree, pgr);
+  
+  if (target_read_memory (pgr_addr, pgr, PIP_GDBIF_ROOT_SIZE) != 0)
+    {
+      warning (_("Error reading PiP gdbif root entry at %s"),
+	       paddress (target_gdbarch (), pgr_addr)),
+      pgr_info = NULL;
+    }
+  else
+    {
+      struct type *ptr_type =
+	builtin_type (target_gdbarch ())->builtin_data_ptr;
+
+      pgr_info = xzalloc (sizeof (*pgr_info));
+      pgr_info->pgr_addr = pgr_addr;
+
+      /* XXX these offsets are for LP64 platform only. */
+      pgr_info->pgr_task_root_addr = pgr_addr + 40;
+      pgr_info->pgr_hook_before_main =
+	extract_typed_address (&pgr[0], ptr_type);
+      pgr_info->pgr_hook_after_main =
+	extract_typed_address (&pgr[8], ptr_type);
+    }
+
+  do_cleanups (back_to);
+
+  return pgr_info;
+
+}
+
+static struct pip_gdbif_root_info *
+pip_gdbif_root_read (void)
+{
+  struct type *ptr_type = builtin_type (target_gdbarch ())->builtin_data_ptr;
+  struct minimal_symbol *pip_gdbif_root_sym;
+  CORE_ADDR addr, pip_gdbif_root;
+  struct pip_gdbif_root_info *pgr_info;
+
+  if (svr4_debug)
+    fprintf_unfiltered (gdb_stdlog, "PiP debug: <%s>\n", __func__);
+  pip_gdbif_root_sym =
+    lookup_minimal_symbol ("pip_gdbif_root", NULL, NULL);
+  if (pip_gdbif_root_sym == 0)
+    {
+      /* pip_gdbif_root is available only in PiP root tasks */
+      if (svr4_debug)
+	fprintf_unfiltered (gdb_stdlog,
+			    "PiP debug: symbol pip_gdbif_root not found.\n");
+      return NULL;
+    }
+  addr = SYMBOL_VALUE_ADDRESS (pip_gdbif_root_sym);
+  if (svr4_debug)
+    fprintf_unfiltered (gdb_stdlog, "PiP debug: root addr=0x%lx\n",
+			(long)addr);
+
+  pip_gdbif_root = read_memory_typed_address (addr, ptr_type);
+  if (pip_gdbif_root == 0) {
+    /* pip_gdbif_root in PiP child tasks is NULL */
+    if (svr4_debug)
+      fprintf_unfiltered (gdb_stdlog,
+			  "PiP debug: pip_gdbif_root is NULL.\n");
+    return NULL;
+  }
+
+  pgr_info = pip_gdbif_root_info_read (pip_gdbif_root);
+
+  return pgr_info;
+}
+
+struct unattached_pip_task {
+  struct unattached_pip_task *next;
+  int pid;
+};
+
+static struct unattached_pip_task *unattached_pip_task_list = NULL;
+
+static void
+unattached_pip_task_list_free (void *p)
+{
+  struct unattached_pip_task *list = p;
+  struct unattached_pip_task *task, *next;
+
+  for (task = list; task != NULL; task = next)
+    {
+      next = task->next;
+      xfree (task);
+    }
+}
+
+static void
+unattached_pip_task_list_clear (void *dummy)
+{
+  unattached_pip_task_list_free (unattached_pip_task_list);
+  unattached_pip_task_list = NULL;
+}
+
+static void
+unattached_pip_task_list_add (int pid)
+{
+  struct unattached_pip_task *task = xmalloc (sizeof (*task));
+
+  if (task == NULL)
+    {
+      printf_unfiltered ("cannot allocate memory "
+			 "for unatached PiP task pid:%d\n", pid);
+      return;
+    }
+  task->pid = pid;
+  task->next = unattached_pip_task_list;
+  unattached_pip_task_list = task;
+}
+
+static void
+unattached_pip_task_list_foreach (void (*doit)(int))
+{
+  struct unattached_pip_task *list = NULL, *task, *entry;
+  struct cleanup *old_chain =
+    make_cleanup (unattached_pip_task_list_clear, NULL);
+
+  /*
+   * copy unattached_pip_task_list to `list' at first,
+   * because unattached_pip_task_list will be broken by (*doit)().
+   */
+  for (task = unattached_pip_task_list; task != NULL; task = task->next)
+    {
+      entry  = xmalloc (sizeof (*entry));
+      if (entry == NULL)
+	{
+	  printf_unfiltered ("cannot allocate memory "
+			     "for unattached_pip_task_list_foreach\n");
+	  unattached_pip_task_list_free (list);
+	  do_cleanups (old_chain);
+	  return;
+	}
+      entry->pid = task->pid;
+      entry->next = list;
+      list = entry;
+    }
+
+  make_cleanup (unattached_pip_task_list_free, list);
+
+  /* then call (*doit) () */
+  for (entry = list; entry != NULL; entry = entry->next)
+    (*doit) (entry->pid);
+
+  do_cleanups (old_chain);
+}
+
+int
+pip_scan_inferiors (void)
+{
+  struct pip_gdbif_root_info *pgr_info = pip_gdbif_root_read ();
+  struct pip_gdbif_task_info *pgt_info;
+  CORE_ADDR pgt_addr;
+
+  if (pgr_info == NULL)
+    return 0;
+
+  unattached_pip_task_list_clear (NULL);
+
+  pgt_addr = pgr_info->pgr_task_root_addr;
+  do {
+    pgt_info = pip_gdbif_task_info_read (pgt_addr);
+    if (pgt_info == NULL)
+      break;
+    if (svr4_debug)
+      fprintf_unfiltered (gdb_stdlog, "PiP debug: pip_gdbif pid:%d pipid:%d\n",
+			  (int)pgt_info->pgt_pid, (int)pgt_info->pgt_pipid);
+
+    if (pgt_info->pgt_pipid != PIP_GDBIF_PIPID_ANY)
+      {
+	struct inferior *inf;
+	int already_attached = 0;
+
+	for (inf = inferior_list; inf; inf = inf->next)
+	  {
+	    if (svr4_debug)
+	      fprintf_unfiltered (gdb_stdlog,
+				  "PiP debug: inferior pid:%d pipid:%d\n",
+				  (int)inf->pid, (int)inf->pipid);
+
+            if (inf->pid == pgt_info->pgt_pid)
+	      {
+		already_attached = 1;
+
+		/* not initialized yet? */
+		if (inf->pipid == PIP_GDBIF_PIPID_ANY)
+		  {
+		    inf->pipid = pgt_info->pgt_pipid;
+		    if (inf->pipid != PIP_GDBIF_PIPID_ROOT)
+		      {
+			int errcode;
+			
+			inf->pip_load_address = pgt_info->pgt_load_address;
+			target_read_string (pgt_info->pgt_realpathname,
+					    &inf->pip_pathname, PATH_MAX - 1,
+					    &errcode);
+			if (errcode)
+			  {
+			    warning (_("failed to read exec filename of "
+				       "PiP task %d: %s"),
+				     inf->pipid, safe_strerror (errcode));
+			    inf->pip_pathname = NULL;
+			  }
+		      }
+		  }
+	      }
+	  }
+	if (!already_attached)
+	  unattached_pip_task_list_add (pgt_info->pgt_pid);
+      }
+
+    pgt_addr = pgt_info->pgt_next;
+    xfree (pgt_info);
+  } while (pgt_addr != pgr_info->pgr_task_root_addr &&
+	   pgt_addr != 0 /* fail safe */);
+
+  xfree (pgr_info);
+  return 1;
+}
+
 static void
 attach_pid (int pid)
 {
@@ -2929,7 +3258,7 @@ svr4_relocate_main_executable (void)
    */
   solib_add (NULL, 0, &current_target, auto_solib_add);
 
-  if (!linux_pip_scan ())
+  if (!pip_scan_inferiors ())
     {
       if (svr4_debug)
 	printf_unfiltered ("linux_pip_scan () -> FAIL\n");
@@ -3007,6 +3336,8 @@ svr4_relocate_main_executable (void)
 	}
       if (pip_auto_attach)
 	attach_pip_tasks();
+      else
+	unattached_pip_task_list_clear (NULL);
     }
 #endif /* ENABLE_PIP */
 }

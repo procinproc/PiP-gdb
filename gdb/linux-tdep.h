@@ -36,11 +36,4 @@ struct type *linux_get_siginfo_type (struct gdbarch *);
 
 extern void linux_init_abi (struct gdbarch_info info, struct gdbarch *gdbarch);
 
-#ifdef ENABLE_PIP
-
-extern void unattached_pip_task_list_foreach (void (*doit) (int pid));
-extern int linux_pip_scan (void);
-
-#endif /* ENABLE_PIP */
-
 #endif /* linux-tdep.h */
