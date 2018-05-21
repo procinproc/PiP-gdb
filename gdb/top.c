@@ -1142,11 +1142,7 @@ and \"show warranty\" for details.\n");
 
   /* After the required info we print the configuration information.  */
 
-#ifdef ENABLE_PIP
-  fprintf_filtered (stream, "This PiP-GDB was configured as \"");
-#else
   fprintf_filtered (stream, "This GDB was configured as \"");
-#endif
   if (strcmp (host_name, target_name) != 0)
     {
       fprintf_filtered (stream, "--host=%s --target=%s",
