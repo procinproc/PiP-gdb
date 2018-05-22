@@ -7,8 +7,15 @@
   * Written by Atsushi HORI <ahori@riken.jp>, 2016
 */
 
-#include <test.h>
+#include <pip.h>
+#include <pip_debug.h> /* DBGF */
 #include <unistd.h>
+
+/* from PIP/test/test.h */
+#define PRINT_FL(FSTR,V)	\
+  fprintf(stderr,"%s:%d %s=%d\n",__FILE__,__LINE__,FSTR,V)
+#define TESTINT(F)		\
+  do{int __xyz=(F); if(__xyz){PRINT_FL(#F,__xyz);exit(9);}} while(0)
 
 int root_exp = 0;
 
@@ -37,7 +44,7 @@ int main( int argc, char **argv ) {
   int retval;
   pthread_t t1, t2;
 
-  ntasks = NTASKS;
+  ntasks = PIP_NTASKS_MAX;
   TESTINT( pip_init( &pipid, &ntasks, NULL, 0 ) );
 
   pthread_create(&t1, NULL, thread1, (void *)NULL);
