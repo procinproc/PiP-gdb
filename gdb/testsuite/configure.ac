@@ -83,6 +83,89 @@ else
 fi
 AC_SUBST(RPATH_ENVVAR)
 
+#
+# PiP
+#
+AC_MSG_CHECKING([for glibc libdir])
+AC_ARG_WITH([glibc-libdir],
+  [AS_HELP_STRING([--with-glibc-libdir@<:@=DIR@:>@],
+                  [specify glibc lib directory])])
+pip_glibc_libdir=
+pip_dynamic_linker=
+if test x"${with_glibc_libdir}" = x"no"; then
+  AC_MSG_RESULT([disabled])
+else
+  case "${with_glibc_libdir}" in
+  ""|yes) libdir_candidates="/lib64 /lib /libexec /usr/lib /usr/libexec";;
+  *) libdir_candidates="${with_glibc_libdir}";;
+  esac
+  ld_so_candidates=
+  for d in ${libdir_candidates}; do
+    if ld_so_candidates=`ls -d "${d}"/ld-@<:@0-9@:>@*.so 2>/dev/null`; then
+      break
+    elif ld_so_candidates=`ls -d "${d}"/ld.so.* 2>/dev/null`; then
+      break
+    elif ld_so_candidates=`ls -d "${d}"/ld-elf.so.* 2>/dev/null`; then
+      break
+    elif ld_so_candidates=`ls -d "${d}"/ld.elf_so 2>/dev/null`; then
+      break
+    fi
+  done
+  if test x"${ld_so_candidates}" != x""; then
+    ld_so=`echo "${ld_so_candidates}" | awk '{print $NF; exit}'`
+    d=`dirname "${ld_so}"`
+    if test -d "${d}" -a -x "${ld_so}"; then
+      pip_glibc_libdir="${d}"
+      pip_dynamic_linker="${ld_so}"
+      AC_MSG_RESULT([${pip_glibc_libdir}])
+    fi
+  fi
+  if test x"${pip_glibc_libdir}" = x""; then
+    if test x"${with_glibc_libdir}" = x""; then
+      AC_MSG_RESULT([no])
+    else
+      AC_MSG_ERROR([can't find ld.so.])
+    fi
+  fi
+fi
+AC_SUBST(pip_glibc_libdir)
+AC_SUBST(pip_dynamic_linker)
+
+
+AC_MSG_CHECKING([for PiP])
+AC_ARG_WITH([pip],
+  [AS_HELP_STRING([--with-pip@<:@=DIR@:>@],
+	          [specify prefix directory for the installed PiP package])])
+case "$with_pip" in
+yes)	if test -f /usr/local/include/pip.h; then with_pip=/usr/local
+	elif test -f /usr/pkg/include/pip.h; then with_pip=/usr/pkg
+	else with_pip=/usr
+	fi;;
+'')	with_pip=no;;	# default is "no"
+esac
+pip_site_exp="proc skip_pip_tests {} { return 1; }"
+if test x"${with_pip}" = x"no"; then
+  AC_MSG_RESULT([disabled])
+elif test -f "${with_pip}/include/pip.h"; then
+  AC_MSG_RESULT([${with_pip}])
+  CPPFLAGS="$CPPFLAGS -DENABLE_PIP -I${with_pip}/include"
+  pie_cflags='-fPIE'
+  pie_ldflags='-pie -rdynamic'
+  pip_site_exp="\\
+proc skip_pip_tests {} { return 0; }|\\
+set pie_cflags \\\"${pie_cflags}\\\"|\\
+set pie_ldflags \\\"${pie_ldflags}\\\"|\\
+set pip_cppflags \\\"-I${with_pip}/include\\\"|\\
+set pip_cflags \\\"${pie_cflags} -pthread\\\"|\\
+set pip_ldflags \\\"${pie_ldflags} -pthread -Wl,--dynamic-linker=${pip_dynamic_linker}\\\"|\\
+set pip_libs \\\"-L${with_pip}/lib -Wl,-rpath=${with_pip}/lib -lpip -ldl\\\""
+else
+  AC_MSG_ERROR([can't find "${with_pip}/include/pip.h"])
+fi
+AC_SUBST(with_pip)
+AC_SUBST(pip_site_exp)
+
+
 AC_CHECK_HEADERS(pthread.h)
 
 AC_EXEEXT
