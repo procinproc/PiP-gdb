@@ -1,26 +1,40 @@
-# Copyright 1997-2013 Free Software Foundation, Inc.
+# $RIKEN_copyright:$
+# $PIP_VERSION:$
+# $PIP_license:$
 
-# This program is free software; you can redistribute it and/or modify
-# it under the terms of the GNU General Public License as published by
-# the Free Software Foundation; either version 3 of the License, or
-# (at your option) any later version.
-#
-# This program is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU General Public License for more details.
-#
-# You should have received a copy of the GNU General Public License
-# along with this program.  If not, see <http://www.gnu.org/licenses/>.  */
+if { [skip_pip_tests] } { return -1 }
 
-set binfile gdb.pip/gdb_test
+set testfile    threads
+set executable  gdb_test
+set executable2 sleep
+set srcfile     ${srcdir}/${subdir}/${executable}.c
+set srcfile2    ${srcdir}/${subdir}/${executable2}.c
+set binfile     ${objdir}/${subdir}/${executable}
+set binfile2    ${objdir}/${subdir}/${executable2}
+
+set pie_cc_opt "debug"
+set pie_cc_opt [concat $pie_cc_opt [list "additional_flags=${pie_cflags} ${pie_ldflags}"]]
+
+set pip_cc_opt "debug"
+set pip_cc_opt [concat $pip_cc_opt [list "additional_flags=${pip_cppflags} ${pip_cflags} ${pip_ldflags}"]]
+set pip_cc_opt [concat $pip_cc_opt [list libs=${pip_libs}]]
+
+if { [gdb_compile ${srcfile}  ${binfile}  executable "${pip_cc_opt}" ] != ""} {
+    untested "Could not compile ${binfile} w/ ${pip_cc_opt}."
+    return -1
+}
+
+if { [gdb_compile ${srcfile2} ${binfile2} executable "${pie_cc_opt}"] != "" } {
+    untested "Could not compile ${binfile2} w/ ${pie_cc_opt}."
+    return -1
+}
+
 set env(PIP_MODE) pthread
 set rootpid [eval exec $binfile &]
 
 # The process must be spawned.
 exec sleep 5
 
-set escapedbinfile  [string_to_regexp ${binfile}]
 set use_gdb_stub 0
 set timeout 1000
 

@@ -1,20 +1,39 @@
-# Copyright 1997-2013 Free Software Foundation, Inc.
+# $RIKEN_copyright:$
+# $PIP_VERSION:$
+# $PIP_license:$
 
-# This program is free software; you can redistribute it and/or modify
-# it under the terms of the GNU General Public License as published by
-# the Free Software Foundation; either version 3 of the License, or
-# (at your option) any later version.
-#
-# This program is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU General Public License for more details.
-#
-# You should have received a copy of the GNU General Public License
-# along with this program.  If not, see <http://www.gnu.org/licenses/>.  */
+if { [skip_pip_tests] } { return -1 }
 
-set binfile gdb.pip/gdb_test
-#set binfile gdb.pip/sleep
+set testfile    pip
+set executable  gdb_test
+set executable2 sleep
+set srcfile     ${srcdir}/${subdir}/${executable}.c
+set srcfile2    ${srcdir}/${subdir}/${executable2}.c
+set binfile     ${objdir}/${subdir}/${executable}
+set binfile2    ${objdir}/${subdir}/${executable2}
+
+set pie_cc_opt "debug"
+set pie_cc_opt [concat $pie_cc_opt [list "additional_flags=${pie_cflags} ${pie_ldflags}"]]
+
+set pip_cc_opt "debug"
+set pip_cc_opt [concat $pip_cc_opt [list "additional_flags=${pip_cppflags} ${pip_cflags} ${pip_ldflags}"]]
+set pip_cc_opt [concat $pip_cc_opt [list libs=${pip_libs}]]
+
+if { [gdb_compile ${srcfile}  ${binfile}  executable "${pip_cc_opt}" ] != ""} {
+    untested "Could not compile ${binfile} w/ ${pip_cc_opt}."
+    return -1
+}
+
+if { [gdb_compile ${srcfile2} ${binfile2} executable "${pie_cc_opt}"] != "" } {
+    untested "Could not compile ${binfile2} w/ ${pie_cc_opt}."
+    return -1
+}
+
+set escapedsrcfile  [string_to_regexp ${srcfile}]
+set escapedsrcfile2 [string_to_regexp ${srcfile2}]
+set escapedbinfile  [string_to_regexp ${binfile}]
+set escapedbinfile2 [string_to_regexp ${binfile2}]
+
 set env(PIP_MODE) process:pipclone
 set rootpid [eval exec $binfile &]
 
@@ -22,7 +41,6 @@ set rootpid [eval exec $binfile &]
 exec sleep 5
 
 set taskpid [ exec ps -ax | grep $binfile | gawk "{ if (\$1 != $rootpid && \$5 == \"$binfile\" ) print \$1; }" ]
-set escapedbinfile  [string_to_regexp ${binfile}]
 set use_gdb_stub 0
 set timeout 1000
 
@@ -47,21 +65,21 @@ gdb_test "list" "#endif.*"
 gdb_test "backtrace" "main ().*"
 
 # "info inferiors" test
-gdb_test "info inferiors" "2 .* process .* \\(pip root\\) .*/gdb\\.pip/gdb_test.*"
+gdb_test "info inferiors" "2 .* process .* \\(pip root\\) *${escapedbinfile}.*"
 
-# switching inferior test 1
-gdb_test "inferior 2" "Switching to inferior 2 .* \\(pip root\\).*/gdb\\.pip/gdb_test.*"
+# switching inferior 1
+gdb_test "inferior 2" "Switching to inferior 2 \\\[process \[0-9\]* \\(pip root\\)\\\] \\(${escapedbinfile}\\)\\\].*"
 
-# switching inferior test 2
-gdb_test "inferior 1" "Switching to inferior 1 .* \\(pip 0\\).*/gdb\\.pip/sleep.*"
+# switching inferior 2
+gdb_test "inferior 1" "Switching to inferior 1 \\\[process \[0-9\]* \\(pip 0\\)\\\] \\(${escapedbinfile2}\\)\\\].*"
 
 # breakpoint test.
-gdb_test "break foo" "Breakpoint 1 at .*: file sleep.c,.*" "break 1"
+gdb_test "break foo" "Breakpoint 1 at 0x\[0-9a-f]*: file ${escapedsrcfile2},.*" "break 1"
 
 # delete test.
 gdb_test "delete 1" ""
 gdb_test "info breakpoints" "No breakpoints or watchpoints."
-gdb_test "break foo" "Breakpoint 2 at .*: file sleep.c,.*" "break 2"
+gdb_test "break foo" "Breakpoint 2 at 0x\[0-9a-f]*: file ${escapedsrcfile2},.*" "break 2"
 
 # continue test.
 gdb_test "continue" "Continuing.*"
@@ -78,8 +96,9 @@ gdb_test "next" "Cannot find bounds of current function" "next7"
 # Detach test.
 gdb_test "detach" "process $taskpid.*"
 
-# switching inferior test 3
-gdb_test "inferior 2" "Switching to inferior 2 .* \\(pip root\\).*/gdb\\.pip/gdb_test.*" "inferior 2 - 2"
+# switching inferior 2 - take 2
+gdb_test "inferior 2" "Switching to inferior 2 \\\[process \[0-9\]* \\(pip root\\)\\\] \\(${escapedbinfile}\\)\\\].*" "inferior 2 - 2"
+
 
 # The process must be exit.
 exec sleep 10
