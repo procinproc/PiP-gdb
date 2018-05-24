@@ -660,7 +660,80 @@ if test "$enable_profiling" = yes ; then
   CFLAGS="$OLD_CFLAGS"
 fi
 
-ACX_PKGVERSION([GDB])
+#
+# PiP
+#
+AC_MSG_CHECKING([for glibc libdir])
+AC_ARG_WITH([glibc-libdir],
+  [AS_HELP_STRING([--with-glibc-libdir@<:@=DIR@:>@],
+                  [specify glibc lib directory])])
+pip_glibc_libdir=
+pip_dynamic_linker=
+if test x"${with_glibc_libdir}" = x"no"; then
+  AC_MSG_RESULT([disabled])
+else
+  case "${with_glibc_libdir}" in
+  ""|yes) libdir_candidates="/lib64 /lib /libexec /usr/lib /usr/libexec";;
+  *) libdir_candidates="${with_glibc_libdir}";;
+  esac
+  ld_so_candidates=
+  for d in ${libdir_candidates}; do
+    if ld_so_candidates=`ls -d "${d}"/ld-@<:@0-9@:>@*.so 2>/dev/null`; then
+      break
+    elif ld_so_candidates=`ls -d "${d}"/ld.so.* 2>/dev/null`; then
+      break
+    elif ld_so_candidates=`ls -d "${d}"/ld-elf.so.* 2>/dev/null`; then
+      break
+    elif ld_so_candidates=`ls -d "${d}"/ld.elf_so 2>/dev/null`; then
+      break
+    fi
+  done
+  if test x"${ld_so_candidates}" != x""; then
+    ld_so=`echo "${ld_so_candidates}" | awk '{print $NF; exit}'`
+    d=`dirname "${ld_so}"`
+    if test -d "${d}" -a -x "${ld_so}"; then
+      pip_glibc_libdir="${d}"
+      pip_dynamic_linker="${ld_so}"
+      AC_MSG_RESULT([${pip_glibc_libdir}])
+    fi
+  fi
+  if test x"${pip_glibc_libdir}" = x""; then
+    if test x"${with_glibc_libdir}" = x""; then
+      AC_MSG_RESULT([no])
+    else
+      AC_MSG_ERROR([can't find ld.so.])
+    fi
+  fi
+fi
+AC_SUBST(pip_glibc_libdir)
+AC_SUBST(pip_dynamic_linker)
+
+
+AC_MSG_CHECKING([for PiP])
+AC_ARG_WITH([pip],
+  [AS_HELP_STRING([--with-pip@<:@=DIR@:>@],
+	          [specify prefix directory for the installed PiP package])])
+case "$with_pip" in
+yes)	if test -f /usr/local/include/pip.h; then with_pip=/usr/local
+	elif test -f /usr/pkg/include/pip.h; then with_pip=/usr/pkg
+	else with_pip=/usr
+	fi;;
+'')	with_pip=no;;	# default is "no"
+esac
+default_pkgversion=GDB
+if test x"${with_pip}" = x"no"; then
+  AC_MSG_RESULT([disabled])
+elif test -f "${with_pip}/include/pip.h"; then
+  AC_MSG_RESULT([${with_pip}])
+  CPPFLAGS="$CPPFLAGS -DENABLE_PIP -I${with_pip}/include"
+  default_pkgversion=PiP-GDB
+else
+  AC_MSG_ERROR([can't find "${with_pip}/include/pip.h"])
+fi
+AC_SUBST(with_pip)
+
+
+ACX_PKGVERSION([$default_pkgversion])
 ACX_BUGURL([http://www.gnu.org/software/gdb/bugs/])
 AC_DEFINE_UNQUOTED([PKGVERSION], ["$PKGVERSION"], [Additional package description])
 AC_DEFINE_UNQUOTED([REPORT_BUGS_TO], ["$REPORT_BUGS_TO"], [Bug reporting address])
@@ -899,77 +972,6 @@ else
     LIBS=$save_LIBS
   fi
 fi
-
-#
-# PiP
-#
-AC_MSG_CHECKING([for glibc libdir])
-AC_ARG_WITH([glibc-libdir],
-  [AS_HELP_STRING([--with-glibc-libdir@<:@=DIR@:>@],
-                  [specify glibc lib directory])])
-pip_glibc_libdir=
-pip_dynamic_linker=
-if test x"${with_glibc_libdir}" = x"no"; then
-  AC_MSG_RESULT([disabled])
-else
-  case "${with_glibc_libdir}" in
-  ""|yes) libdir_candidates="/lib64 /lib /libexec /usr/lib /usr/libexec";;
-  *) libdir_candidates="${with_glibc_libdir}";;
-  esac
-  ld_so_candidates=
-  for d in ${libdir_candidates}; do
-    if ld_so_candidates=`ls -d "${d}"/ld-@<:@0-9@:>@*.so 2>/dev/null`; then
-      break
-    elif ld_so_candidates=`ls -d "${d}"/ld.so.* 2>/dev/null`; then
-      break
-    elif ld_so_candidates=`ls -d "${d}"/ld-elf.so.* 2>/dev/null`; then
-      break
-    elif ld_so_candidates=`ls -d "${d}"/ld.elf_so 2>/dev/null`; then
-      break
-    fi
-  done
-  if test x"${ld_so_candidates}" != x""; then
-    ld_so=`echo "${ld_so_candidates}" | awk '{print $NF; exit}'`
-    d=`dirname "${ld_so}"`
-    if test -d "${d}" -a -x "${ld_so}"; then
-      pip_glibc_libdir="${d}"
-      pip_dynamic_linker="${ld_so}"
-      AC_MSG_RESULT([${pip_glibc_libdir}])
-    fi
-  fi
-  if test x"${pip_glibc_libdir}" = x""; then
-    if test x"${with_glibc_libdir}" = x""; then
-      AC_MSG_RESULT([no])
-    else
-      AC_MSG_ERROR([can't find ld.so.])
-    fi
-  fi
-fi
-AC_SUBST(pip_glibc_libdir)
-AC_SUBST(pip_dynamic_linker)
-
-
-AC_MSG_CHECKING([for PiP])
-AC_ARG_WITH([pip],
-  [AS_HELP_STRING([--with-pip@<:@=DIR@:>@],
-	          [specify prefix directory for the installed PiP package])])
-case "$with_pip" in
-yes)	if test -f /usr/local/include/pip.h; then with_pip=/usr/local
-	elif test -f /usr/pkg/include/pip.h; then with_pip=/usr/pkg
-	else with_pip=/usr
-	fi;;
-'')	with_pip=no;;	# default is "no"
-esac
-if test x"${with_pip}" = x"no"; then
-  AC_MSG_RESULT([disabled])
-elif test -f "${with_pip}/include/pip.h"; then
-  AC_MSG_RESULT([${with_pip}])
-  CPPFLAGS="$CPPFLAGS -DENABLE_PIP -I${with_pip}/include"
-else
-  AC_MSG_ERROR([can't find "${with_pip}/include/pip.h"])
-fi
-AC_SUBST(with_pip)
-
 
 dnl Utility to simplify finding libpython.
 dnl $1 = pythonX.Y
