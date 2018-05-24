@@ -6,6 +6,13 @@ case $# in
 	;;
 esac
 
+program_prefix=
+case $@ in
+*--with-pip*)
+	program_prefix=--program-prefix=pip-
+	;;
+esac
+
 : ${BUILD_PARALLELISM=`getconf _NPROCESSORS_ONLN`}
 
 make clean
@@ -30,7 +37,7 @@ find . -name config.cache -delete
 	--with-auto-load-dir='$debugdir:$datadir/auto-load' \
 	--with-auto-load-safe-path='$debugdir:$datadir/auto-load:/usr/bin/mono-gdb.py' \
 	--enable-targets=s390-linux-gnu,powerpc-linux-gnu,powerpcle-linux-gnu \
-	"$@" \
+	"$@" ${program_prefix} \
 	x86_64-redhat-linux-gnu \
     &&
 
