@@ -2,6 +2,10 @@
 
    Copyright (C) 1990-2013 Free Software Foundation, Inc.
 
+   Copyright of the PiP-related portions is:
+   $RIKEN_copyright: 2018 Riken Center for Computational Sceience, 
+	  System Software Devlopment Team. All rights researved$
+
    This file is part of GDB.
 
    This program is free software; you can redistribute it and/or modify
