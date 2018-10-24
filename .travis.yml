@@ -4,7 +4,7 @@ language: c
 compiler:
   - gcc
 install:
-  - sudo apt-get install dc gfortran doxygen flex bison pkg-config libncurses5-dev libexpat1-dev liblzma-dev libreadline-dev
+  - sudo apt-get install dc gfortran doxygen flex bison texinfo pkg-config libncurses5-dev libexpat1-dev liblzma-dev libreadline-dev
   - curl --output /tmp/PIP-glibc.2018-08-28.tar.gz http://www.netbsd.org/~soda/PIP-glibc.2018-08-28.tar.gz
   - curl --output /tmp/PIP-417846d9.tar.gz http://www.netbsd.org/~soda/PIP-417846d9.tar.gz
   - ( sudo mkdir -p /usr/pip &&
