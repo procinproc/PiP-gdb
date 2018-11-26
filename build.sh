@@ -47,6 +47,7 @@ find . -name config.cache -delete
 	--with-expat \
 	--without-libexpat-prefix \
 	--enable-tui \
+	--without-python \
 	--with-rpm \
 	--with-lzma \
 	--without-libunwind \
