@@ -955,7 +955,9 @@ gdb_setup_readline (void)
   /* 6.2 regression: no longed asks for --more--
      gdb.base/readline-ask.exp
      https://bugzilla.redhat.com/show_bug.cgi?id=701131  */
+#ifdef RL_STATE_FEDORA_GDB
   RL_SETSTATE (RL_STATE_FEDORA_GDB);
+#endif
 
   /* This function is a noop for the sync case.  The assumption is
      that the sync setup is ALL done in gdb_init, and we would only

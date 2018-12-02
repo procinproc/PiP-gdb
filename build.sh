@@ -22,6 +22,8 @@ do_build=true
 do_install=true
 
 : ${BUILD_PARALLELISM=`getconf _NPROCESSORS_ONLN`}
+: ${EXTRA_CONFIGURE_OPTIONS="--enable-werror --with-rpm --enable-targets=s390-linux-gnu,powerpc-linux-gnu,powerpcle-linux-gnu"}
+: ${EXTRA_GCC_OPTIONS="-fstack-protector-strong -grecord-gcc-switches"}
 
 program_prefix=
 case $@ in
@@ -50,7 +52,6 @@ if $do_build; then
 
 	./configure \
 		--enable-gdb-build-warnings=,-Wno-unused \
-		--enable-werror \
 		--with-separate-debug-dir=/usr/lib/debug \
 		--disable-sim \
 		--disable-rpath \
@@ -59,14 +60,13 @@ if $do_build; then
 		--without-libexpat-prefix \
 		--enable-tui \
 		--without-python \
-		--with-rpm \
 		--with-lzma \
 		--without-libunwind \
 		--enable-64-bit-bfd \
 		--enable-inprocess-agent \
 		--with-auto-load-dir='$debugdir:$datadir/auto-load' \
 		--with-auto-load-safe-path='$debugdir:$datadir/auto-load:/usr/bin/mono-gdb.py' \
-		--enable-targets=s390-linux-gnu,powerpc-linux-gnu,powerpcle-linux-gnu \
+		${EXTRA_CONFIGURE_OPTIONS} \
 		"$@" ${program_prefix} \
 		x86_64-redhat-linux-gnu \
 	    &&
@@ -74,11 +74,10 @@ if $do_build; then
 	make -j ${BUILD_PARALLELISM} "CFLAGS=-O2 -g -pipe -Wall \
 		-Wp,-D_FORTIFY_SOURCE=2 \
 		-fexceptions \
-		-fstack-protector-strong \
 		--param=ssp-buffer-size=4 \
-		-grecord-gcc-switches \
 		-m64 \
 		-mtune=generic" \
+		${EXTRA_GCC_OPTIONS} \
 		"LDFLAGS=-Wl,-z,relro" \
 		maybe-configure-gdb \
 	    &&
@@ -90,11 +89,10 @@ if $do_build; then
 	make -j ${BUILD_PARALLELISM} "CFLAGS=-O2 -g -pipe -Wall \
 		-Wp,-D_FORTIFY_SOURCE=2 \
 		-fexceptions \
-		-fstack-protector-strong \
 		--param=ssp-buffer-size=4 \
-		-grecord-gcc-switches \
 		-m64 \
 		-mtune=generic" \
+		${EXTRA_GCC_OPTIONS} \
 		"LDFLAGS=-Wl,-z,relro"
 
 else
