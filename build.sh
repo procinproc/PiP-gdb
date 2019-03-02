@@ -18,6 +18,15 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.  */
 
+usage()
+{
+	echo >&2 "Usage: `basename $0` [-b] --prefix=<DIR> [--with-pip=<PIP_DIR> --with-glibc-libdir=<GLIBC_LIBDIR>]"
+	echo >&2 "       `basename $0`  -i"
+	echo >&2 "	-b      : build only, do not install"
+	echo >&2 "	-i      : install only, do not build"
+	exit 2
+}
+
 do_build=true
 do_install=true
 
@@ -38,11 +47,17 @@ case "$1" in
 -i)	do_build=false; shift;;
 esac
 
-case $# in
-0)	echo >&2 Usage: `basename $0` "[-bi] --prefix=<DIR> [--with-pip=<PIP_DIR> --with-glibc-libdir=<GLIBC_LIBDIR>]"
-	exit 2
-	;;
-esac
+if $do_build; then
+	case $# in
+	0)	usage;;
+	*)	:;;
+	esac
+else
+	case $# in
+	0)	:;;
+	*)	usage;;
+	esac
+fi
 
 set -x
 
