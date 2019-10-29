@@ -20,13 +20,15 @@
 
 usage()
 {
-	echo >&2 "Usage: `basename $0` [-b] --prefix=<DIR> [--with-pip=<PIP_DIR> --with-glibc-libdir=<GLIBC_LIBDIR>]"
+	echo >&2 "Usage: `basename $0` [-b [-k]] --prefix=<DIR> [--with-pip=<PIP_DIR> --with-glibc-libdir=<GLIBC_LIBDIR>]"
 	echo >&2 "       `basename $0`  -i"
+#	echo >&2 "	-B      : build only, do not install, do not clean"
 	echo >&2 "	-b      : build only, do not install"
 	echo >&2 "	-i      : install only, do not build"
 	exit 2
 }
 
+do_clean=true
 do_build=true
 do_install=true
 
@@ -41,8 +43,9 @@ case $@ in
 	;;
 esac
 
-# -b and -i have to be first option.
+# -B -b, and -i have to be first option.
 case "$1" in
+-B)	do_install=false; do_clean=false; shift;;
 -b)	do_install=false; shift;;
 -i)	do_build=false; shift;;
 esac
@@ -63,9 +66,11 @@ set -x
 
 if $do_build; then
 
-	make clean
-	make distclean
-	find . -name config.cache -delete
+	if $do_clean; then
+		make clean
+		make distclean
+		find . -name config.cache -delete
+	fi
 
 	./configure \
 		--enable-gdb-build-warnings=,-Wno-unused \
