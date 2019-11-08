@@ -32,8 +32,25 @@ do_clean=true
 do_build=true
 do_install=true
 
+case `uname -m` in
+aarch64)
+	opt_werror=--disable-werror
+	opt_with_rpm=--with-rpm=librpm.so.3
+	opt_inprocess_agent=-disable-inprocess-agent
+	opt_host_arch=
+	host=aarch64-redhat-linux-gnu
+	;;
+x86_64)
+	opt_werror=--enable-werror
+	opt_with_rpm=--with-rpm
+	opt_inprocess_agent=-enable-inprocess-agent
+	opt_host_arch='-m64 -mtune=generic'
+	host=x86_64-redhat-linux-gnu
+	;;
+esac
+
 : ${BUILD_PARALLELISM=`getconf _NPROCESSORS_ONLN`}
-: ${EXTRA_CONFIGURE_OPTIONS="--enable-werror --with-rpm --enable-targets=s390-linux-gnu,powerpc-linux-gnu,powerpcle-linux-gnu"}
+: ${EXTRA_CONFIGURE_OPTIONS="${opt_werror} ${opt_with_rpm} ${opt_inprocess_agent} --enable-targets=s390-linux-gnu,powerpc-linux-gnu,powerpcle-linux-gnu"}
 : ${EXTRA_GCC_OPTIONS="-fstack-protector-strong -grecord-gcc-switches"}
 
 program_prefix=
@@ -85,20 +102,18 @@ if $do_build; then
 		--with-lzma \
 		--without-libunwind \
 		--enable-64-bit-bfd \
-		--enable-inprocess-agent \
 		--with-auto-load-dir='$debugdir:$datadir/auto-load' \
 		--with-auto-load-safe-path='$debugdir:$datadir/auto-load:/usr/bin/mono-gdb.py' \
 		${EXTRA_CONFIGURE_OPTIONS} \
 		"$@" ${program_prefix} \
-		x86_64-redhat-linux-gnu \
+		${host} \
 	    &&
 
 	make -j ${BUILD_PARALLELISM} "CFLAGS=-O2 -g -pipe -Wall \
 		-Wp,-D_FORTIFY_SOURCE=2 \
 		-fexceptions \
 		--param=ssp-buffer-size=4 \
-		-m64 \
-		-mtune=generic \
+		${opt_host_arch} \
 		${EXTRA_GCC_OPTIONS}" \
 		"LDFLAGS=-Wl,-z,relro" \
 		maybe-configure-gdb \
@@ -112,8 +127,7 @@ if $do_build; then
 		-Wp,-D_FORTIFY_SOURCE=2 \
 		-fexceptions \
 		--param=ssp-buffer-size=4 \
-		-m64 \
-		-mtune=generic \
+		${opt_host_arch} \
 		${EXTRA_GCC_OPTIONS}" \
 		"LDFLAGS=-Wl,-z,relro"
 
