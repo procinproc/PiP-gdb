@@ -80,10 +80,10 @@ gdb_test "backtrace" "main ().*"
 # "info inferiors" test
 gdb_test "info inferiors" "2 .* process .* \\(pip root\\) *${escapedbinfile}.*"
 
-# switching inferior 1
+# switching inferior 2
 gdb_test "inferior 2" "Switching to inferior 2 \\\[process \[0-9\]* \\(pip root\\)\\\] \\(${escapedbinfile}\\)\\\].*"
 
-# switching inferior 2
+# switching inferior 1
 gdb_test "inferior 1" "Switching to inferior 1 \\\[process \[0-9\]* \\(pip 0\\)\\\] \\(${escapedbinfile2}\\)\\\].*"
 
 # breakpoint test.
