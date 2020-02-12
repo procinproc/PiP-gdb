@@ -47,13 +47,15 @@ set escapedsrcfile2 [string_to_regexp ${srcfile2}]
 set escapedbinfile  [string_to_regexp ${binfile}]
 set escapedbinfile2 [string_to_regexp ${binfile2}]
 
+exec sh -c "ps -axw | grep $binfile | gawk '{ if (\$5 == \"$binfile\" ) print \$1; }' | while read pid; do kill -9 \$pid; done"
+
 set env(PIP_MODE) process:pipclone
 set rootpid [eval exec $binfile &]
 
 # The process must be spawned.
 exec sleep 5
 
-set taskpid [ exec ps -ax | grep $binfile | gawk "{ if (\$1 != $rootpid && \$5 == \"$binfile\" ) print \$1; }" ]
+set taskpid [ exec ps -axw | grep $binfile | gawk "{ if (\$1 != $rootpid && \$5 == \"$binfile\" ) pid=\$1 } END { print pid }" ]
 set use_gdb_stub 0
 set timeout 1000
 
