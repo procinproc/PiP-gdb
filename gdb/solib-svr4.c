@@ -65,7 +65,7 @@ static void svr4_free_library_list (void *p_list);
 
 static unsigned int svr4_debug = 0;
 
-static int pip_auto_attach = 0;
+static int pip_auto_attach = 1;
 #endif /* ENABLE_PIP */
 
 /* Link map info to include in an allocated so_list entry.  */
