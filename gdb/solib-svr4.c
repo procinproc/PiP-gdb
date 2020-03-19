@@ -3,7 +3,7 @@
    Copyright (C) 1990-2013 Free Software Foundation, Inc.
 
    Copyright of the PiP-related portions is:
-   $RIKEN_copyright: 2018 Riken Center for Computational Sceience, 
+   $RIKEN_copyright: 2018 Riken Center for Computational Sceience,
 	  System Software Devlopment Team. All rights researved$
 
    This file is part of GDB.
@@ -58,6 +58,8 @@ static void svr4_relocate_main_executable (void);
 static void svr4_free_library_list (void *p_list);
 
 #ifdef ENABLE_PIP
+#include <pip_gdbif_defs.h>
+#define PIP_GDBIF_ENUM_ONLY
 #include <pip_gdbif.h>
 
 #include "target-descriptions.h"
@@ -65,7 +67,7 @@ static void svr4_free_library_list (void *p_list);
 
 static unsigned int svr4_debug = 0;
 
-static int pip_auto_attach = 0;
+static int pip_auto_attach = 1;
 #endif /* ENABLE_PIP */
 
 /* Link map info to include in an allocated so_list entry.  */
@@ -2490,7 +2492,7 @@ struct pip_gdbif_task_info {
   int pgt_status;
   int pgt_gdb_status;
 };
-#define PIP_GDBIF_TASK_SIZE	112	/* XXX for LP64 platform only */
+//AH//#define PIP_GDBIF_TASK_SIZE	112	/* XXX for LP64 platform only */
 
 static struct pip_gdbif_task_info *
 pip_gdbif_task_info_read (CORE_ADDR pgt_addr)
@@ -2504,7 +2506,7 @@ pip_gdbif_task_info_read (CORE_ADDR pgt_addr)
 			      __func__, (long)pgt_addr);
   pgt = xmalloc (PIP_GDBIF_TASK_SIZE);
   back_to = make_cleanup (xfree, pgt);
-  
+
   if (target_read_memory (pgt_addr, pgt, PIP_GDBIF_TASK_SIZE) != 0)
     {
       warning (_("Error reading PiP gdbif task entry at %s"),
@@ -2520,26 +2522,26 @@ pip_gdbif_task_info_read (CORE_ADDR pgt_addr)
       pgt_info = xzalloc (sizeof (*pgt_info));
       pgt_info->pgt_addr = pgt_addr;
 
-      /* XXX these offsets are for LP64 platform only. */
-      pgt_info->pgt_next = extract_typed_address (&pgt[0], ptr_type);
-      pgt_info->pgt_prev = extract_typed_address (&pgt[8], ptr_type);
-      pgt_info->pgt_root = extract_typed_address (&pgt[16], ptr_type);
-      pgt_info->pgt_pathname = extract_typed_address (&pgt[32], ptr_type);
-      pgt_info->pgt_realpathname = extract_typed_address (&pgt[40], ptr_type);
-      pgt_info->pgt_argc = extract_signed_integer (&pgt[48], 4, byte_order);
-      pgt_info->pgt_argv = extract_typed_address (&pgt[56], ptr_type);
-      pgt_info->pgt_envv = extract_typed_address (&pgt[64], ptr_type);
-      pgt_info->pgt_handle = extract_typed_address (&pgt[72], ptr_type);
-      pgt_info->pgt_load_address = extract_typed_address (&pgt[80], ptr_type);
-      pgt_info->pgt_pid = extract_signed_integer (&pgt[88], 4, byte_order);
-      pgt_info->pgt_pipid = extract_signed_integer (&pgt[92], 4, byte_order);
+      /* XXX these offsets are for LP64 platform only. -- FIXED by AH 2020/03/19 */
+      pgt_info->pgt_next = extract_typed_address (&pgt[PIP_GDBIF_TASK_OFFSET_NEXT], ptr_type);
+      pgt_info->pgt_prev = extract_typed_address (&pgt[PIP_GDBIF_TASK_OFFSET_PREV], ptr_type);
+      pgt_info->pgt_root = extract_typed_address (&pgt[PIP_GDBIF_TASK_ROOT], ptr_type);
+      pgt_info->pgt_pathname = extract_typed_address (&pgt[PIP_GDBIF_TASK_PATHNAME], ptr_type);
+      pgt_info->pgt_realpathname = extract_typed_address (&pgt[PIP_GDBIF_TASK_REALPATHNAME], ptr_type);
+      pgt_info->pgt_argc = extract_signed_integer (&pgt[PIP_GDBIF_TASK_ARGC], 4, byte_order);
+      pgt_info->pgt_argv = extract_typed_address (&pgt[PIP_GDBIF_TASK_ARGV], ptr_type);
+      pgt_info->pgt_envv = extract_typed_address (&pgt[PIP_GDBIF_TASK_ENVV], ptr_type);
+      pgt_info->pgt_handle = extract_typed_address (&pgt[PIP_GDBIF_TASK_HANDLE], ptr_type);
+      pgt_info->pgt_load_address = extract_typed_address (&pgt[PIP_GDBIF_TASK_LOAD_ADDRESS], ptr_type);
+      pgt_info->pgt_pid = extract_signed_integer (&pgt[PIP_GDBIF_TASK_PID], 4, byte_order);
+      pgt_info->pgt_pipid = extract_signed_integer (&pgt[PIP_GDBIF_TASK_PIPID], 4, byte_order);
       pgt_info->pgt_exit_code =
-	extract_signed_integer (&pgt[96], 4, byte_order);
+	extract_signed_integer (&pgt[PIP_GDBIF_TASK_EXIT_CODE], 4, byte_order);
       pgt_info->pgt_exec_mode =
-	extract_signed_integer (&pgt[100], 4, byte_order);
-      pgt_info->pgt_status = extract_signed_integer (&pgt[104], 4, byte_order);
+	extract_signed_integer (&pgt[PIP_GDBIF_TASK_EXEC_MODE], 4, byte_order);
+      pgt_info->pgt_status = extract_signed_integer (&pgt[PIP_GDBIF_TASK_STATUS], 4, byte_order);
       pgt_info->pgt_gdb_status =
-	extract_signed_integer (&pgt[108], 4, byte_order);
+	extract_signed_integer (&pgt[PIP_GDBIF_TASK_GDB_STATUS], 4, byte_order);
     }
 
   do_cleanups (back_to);
@@ -2553,7 +2555,7 @@ struct pip_gdbif_root_info {
   CORE_ADDR pgr_hook_before_main;
   CORE_ADDR pgr_hook_after_main;
 };
-#define PIP_GDBIF_ROOT_SIZE	152	/* XXX for LP64 platform only */
+//AH//#define PIP_GDBIF_ROOT_SIZE	152	/* XXX for LP64 platform only */
 
 static struct pip_gdbif_root_info *
 pip_gdbif_root_info_read (CORE_ADDR pgr_addr)
@@ -2567,7 +2569,7 @@ pip_gdbif_root_info_read (CORE_ADDR pgr_addr)
 			__func__, (long)pgr_addr);
   pgr = xmalloc (PIP_GDBIF_ROOT_SIZE);
   back_to = make_cleanup (xfree, pgr);
-  
+
   if (target_read_memory (pgr_addr, pgr, PIP_GDBIF_ROOT_SIZE) != 0)
     {
       warning (_("Error reading PiP gdbif root entry at %s"),
@@ -2585,9 +2587,9 @@ pip_gdbif_root_info_read (CORE_ADDR pgr_addr)
       /* XXX these offsets are for LP64 platform only. */
       pgr_info->pgr_task_root_addr = pgr_addr + 40;
       pgr_info->pgr_hook_before_main =
-	extract_typed_address (&pgr[0], ptr_type);
+	extract_typed_address (&pgr[PIP_GDBIF_ROOT_OFFSET_BEFOER_MAIN], ptr_type);
       pgr_info->pgr_hook_after_main =
-	extract_typed_address (&pgr[8], ptr_type);
+	extract_typed_address (&pgr[PIP_GDBIF_ROOT_OFFSET_AFTER_MAIN], ptr_type);
     }
 
   do_cleanups (back_to);
@@ -2607,13 +2609,14 @@ pip_gdbif_root_read (void)
   if (svr4_debug)
     fprintf_unfiltered (gdb_stdlog, "PiP debug: <%s>\n", __func__);
   pip_gdbif_root_sym =
-    lookup_minimal_symbol ("pip_gdbif_root", NULL, NULL);
+    lookup_minimal_symbol (PIP_GDBIF_ROOT_VARNAME, NULL, NULL);
   if (pip_gdbif_root_sym == 0)
     {
       /* pip_gdbif_root is available only in PiP root tasks */
       if (svr4_debug)
 	fprintf_unfiltered (gdb_stdlog,
-			    "PiP debug: symbol pip_gdbif_root not found.\n");
+			    "PiP debug: symbol '%s' not found.\n",
+			    PIP_GDBIF_ROOT_VARNAME);
       return NULL;
     }
   addr = SYMBOL_VALUE_ADDRESS (pip_gdbif_root_sym);
@@ -2758,7 +2761,7 @@ pip_scan_inferiors (void)
 		    if (inf->pipid != PIP_GDBIF_PIPID_ROOT)
 		      {
 			int errcode;
-			
+
 			inf->pip_load_address = pgt_info->pgt_load_address;
 			target_read_string (pgt_info->pgt_realpathname,
 					    &inf->pip_pathname, PATH_MAX - 1,
