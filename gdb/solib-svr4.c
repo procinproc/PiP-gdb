@@ -58,9 +58,8 @@ static void svr4_relocate_main_executable (void);
 static void svr4_free_library_list (void *p_list);
 
 #ifdef ENABLE_PIP
-#include <pip_gdbif_defs.h>
-#define PIP_GDBIF_ENUM_ONLY
-#include <pip_gdbif.h>
+#include <pip_gdbif_enums.h>
+#include <pip_gdbif_offsets.h>
 
 #include "target-descriptions.h"
 #include "gdbcmd.h"

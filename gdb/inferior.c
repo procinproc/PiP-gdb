@@ -41,11 +41,10 @@
 #include "target-descriptions.h"
 
 #ifdef ENABLE_PIP
-#include "solib-svr4.h" /* pip_scan_inferiors () */
+#include <pip_gdbif_enums.h>
+#include <pip_gdbif_offsets.h>
 
-#include <pip_gdbif_defs.h>
-#define PIP_GDBIF_ENUM_ONLY
-#include <pip_gdbif.h>
+#include "solib-svr4.h" /* pip_scan_inferiors () */
 #endif
 
 void _initialize_inferiors (void);
