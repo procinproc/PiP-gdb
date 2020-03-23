@@ -2491,7 +2491,6 @@ struct pip_gdbif_task_info {
   int pgt_status;
   int pgt_gdb_status;
 };
-//AH//#define PIP_GDBIF_TASK_SIZE	112	/* XXX for LP64 platform only */
 
 static struct pip_gdbif_task_info *
 pip_gdbif_task_info_read (CORE_ADDR pgt_addr)
@@ -2554,7 +2553,6 @@ struct pip_gdbif_root_info {
   CORE_ADDR pgr_hook_before_main;
   CORE_ADDR pgr_hook_after_main;
 };
-//AH//#define PIP_GDBIF_ROOT_SIZE	152	/* XXX for LP64 platform only */
 
 static struct pip_gdbif_root_info *
 pip_gdbif_root_info_read (CORE_ADDR pgr_addr)
