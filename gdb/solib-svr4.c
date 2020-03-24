@@ -64,7 +64,7 @@ static void svr4_free_library_list (void *p_list);
 #include "target-descriptions.h"
 #include "gdbcmd.h"
 
-static unsigned int svr4_debug = 0;
+static unsigned int svr4_debug = 1;
 
 static int pip_auto_attach = 1;
 #endif /* ENABLE_PIP */
@@ -2582,7 +2582,7 @@ pip_gdbif_root_info_read (CORE_ADDR pgr_addr)
       pgr_info->pgr_addr = pgr_addr;
 
       /* XXX these offsets are for LP64 platform only. */
-      pgr_info->pgr_task_root_addr = pgr_addr + 40;
+      pgr_info->pgr_task_root_addr = pgr_addr + PIP_GDBIF_ROOT_OFFSET_TASK_ROOT;
       pgr_info->pgr_hook_before_main =
 	extract_typed_address (&pgr[PIP_GDBIF_ROOT_OFFSET_BEFOER_MAIN], ptr_type);
       pgr_info->pgr_hook_after_main =
@@ -2885,9 +2885,10 @@ svr4_exec_displacement (CORE_ADDR *displacementp)
      being executed themselves and PIE (Position Independent Executable)
      executables are ET_DYN.  */
 
+#ifdef PIP_NO_WORKAROUND
   if ((bfd_get_file_flags (exec_bfd) & DYNAMIC) == 0)
     return 0;
-
+#endif
   if (target_auxv_search (&current_target, AT_ENTRY, &entry_point) <= 0)
     return 0;
 
