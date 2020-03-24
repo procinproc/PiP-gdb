@@ -64,7 +64,7 @@ static void svr4_free_library_list (void *p_list);
 #include "target-descriptions.h"
 #include "gdbcmd.h"
 
-static unsigned int svr4_debug = 1;
+static unsigned int svr4_debug = 0;
 
 static int pip_auto_attach = 1;
 #endif /* ENABLE_PIP */
