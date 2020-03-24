@@ -615,11 +615,13 @@ find_program_interpreter (void)
    {
      struct bfd_section *interp_sect;
 
+  DBG;
      interp_sect = bfd_get_section_by_name (exec_bfd, ".interp");
      if (interp_sect != NULL)
       {
 	int sect_size = bfd_section_size (exec_bfd, interp_sect);
 
+  DBG;
 	buf = xmalloc (sect_size);
 	bfd_get_section_contents (exec_bfd, interp_sect, buf, 0, sect_size);
       }
@@ -627,8 +629,10 @@ find_program_interpreter (void)
 
   /* If we didn't find it, use the target auxillary vector.  */
   if (!buf)
-    buf = read_program_header (PT_INTERP, NULL, NULL);
-
+    {
+      DBG;
+      buf = read_program_header (PT_INTERP, NULL, NULL);
+    }
   return buf;
 }
 
@@ -2721,11 +2725,14 @@ pip_scan_inferiors (void)
   struct pip_gdbif_task_info *pgt_info;
   CORE_ADDR pgt_addr;
 
+  DBG;
   if (pgr_info == NULL)
     return 0;
 
+  DBG;
   unattached_pip_task_list_clear (NULL);
 
+  DBG;
   pgt_addr = pgr_info->pgr_task_root_addr;
   do {
     pgt_info = pip_gdbif_task_info_read (pgt_addr);
@@ -2791,7 +2798,7 @@ static void
 attach_pid (int pid)
 {
   struct inferior *inf = add_inferior_with_spaces ();
-  char pidarg[30];
+  char pidarg[32];
 
   printf_filtered (_("Added inferior %d\n"), inf->num);
   set_current_inferior (inf);
