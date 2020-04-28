@@ -35,7 +35,7 @@
 #define PRINT_FL(FSTR,V)	\
   fprintf(stderr,"%s:%d %s=%d\n",__FILE__,__LINE__,FSTR,V)
 #define TESTINT(F)		\
-  do{int __xyz=(F); if(__xyz){PRINT_FL(#F,__xyz);exit(9);}} while(0)
+  do{int __xyz=(F); if(__xyz){PRINT_FL(#F,__xyz);_exit(9);}} while(0)
 
 int root_exp = 0;
 
