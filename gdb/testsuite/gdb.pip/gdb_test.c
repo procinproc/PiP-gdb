@@ -1,5 +1,5 @@
 /*
-   $RIKEN_copyright: 2018 Riken Center for Computational Sceience, 
+   $RIKEN_copyright: 2018 Riken Center for Computational Sceience,
 	  System Software Devlopment Team. All rights researved$
 
    This file is part of GDB.
@@ -21,7 +21,14 @@
 */
 
 #include <pip.h>
+#ifdef AH
 #include <pip_debug.h> /* DBGF */
+#else
+#ifdef DEBUG
+#define DBGF(...)  \
+  do { fprintf(stderr,__VA_ARGS__); fprintf( stderr, "\n" ); } while(0)
+#endif
+#endif
 #include <unistd.h>
 
 /* from PIP/test/test.h */
@@ -87,7 +94,7 @@ int main( int argc, char **argv ) {
     } else {
       fprintf( stderr, " terminated. OK\n" );
     }
-    
+
     TESTINT( pip_fin() );
 
   } else {
