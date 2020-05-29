@@ -1,32 +1,49 @@
 #!/bin/sh
 
-# $RIKEN_copyright: 2018 Riken Center for Computational Sceience, 
+# $RIKEN_copyright: 2018 Riken Center for Computational Sceience,
 # 	  System Software Devlopment Team. All rights researved$
 #
 # This file is part of GDB.
-# 
+#
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
 # the Free Software Foundation; either version 3 of the License, or
 # (at your option) any later version.
-# 
+#
 # This program is distributed in the hope that it will be useful,
 # but WITHOUT ANY WARRANTY; without even the implied warranty of
 # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 # GNU General Public License for more details.
-# 
+#
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.  */
 
 usage()
 {
-	echo >&2 "Usage: `basename $0` [-b [-k]] --prefix=<DIR> [--with-pip=<PIP_DIR> --with-glibc-libdir=<GLIBC_LIBDIR>]"
+	echo >&2 "Usage: `basename $0` [-b [-k]] --prefix=<DIR> --with-pip=<PIP_DIR>"
 	echo >&2 "       `basename $0`  -i"
 #	echo >&2 "	-B      : build only, do not install, do not clean"
 	echo >&2 "	-b      : build only, do not install"
 	echo >&2 "	-i      : install only, do not build"
 	exit 2
 }
+
+
+echo "Checking required packages ... "
+
+pkgs_needed="gd-devel libpng-devel zlib-devel libselinux-devel audit-libs-devel libcap-devel nss-devel systemtap-sdt-devel libstdc++-static glibc-static readline-devel ncurses-devel xz-devel rpm-devel expat-devel python-devel texinfo texinfo-tex texlive-ec texlive-cm-super dejagnu"
+
+pkgfail=false;
+nopkg=false;
+for pkgn in $pkgs_needed; do
+    if ! yum info $pkgn >/dev/null 2>&1; then
+	pkgfail=true;
+	echo "'$pkgn' package is not installed but required"
+    fi
+done
+if [ $pkgfail == false ]; then
+    echo "All required packages found"
+fi
 
 do_clean=true
 do_build=true
@@ -59,6 +76,9 @@ case $@ in
 	program_prefix=--program-prefix=pip-
 	;;
 esac
+if [ x$program_prefix == x ]; then
+    usage;
+fi
 
 # -B -b, and -i have to be first option.
 case "$1" in
@@ -77,6 +97,10 @@ else
 	0)	:;;
 	*)	usage;;
 	esac
+fi
+
+if [ $pkgfail == true ]; then
+    exit 1;
 fi
 
 set -x
@@ -110,7 +134,6 @@ if $do_build; then
 	    &&
 
 	make -j ${BUILD_PARALLELISM} "CFLAGS=-O2 -g -pipe -Wall \
-		-Wp,-D_FORTIFY_SOURCE=2 \
 		-fexceptions \
 		--param=ssp-buffer-size=4 \
 		${opt_host_arch} \
