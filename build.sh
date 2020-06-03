@@ -31,7 +31,11 @@ usage()
 
 echo "Checking required packages ... "
 
-pkgs_needed="gd-devel libpng-devel zlib-devel libselinux-devel audit-libs-devel libcap-devel nss-devel systemtap-sdt-devel libstdc++-static glibc-static readline-devel ncurses-devel xz-devel rpm-devel expat-devel python-devel texinfo texinfo-tex texlive-ec texlive-cm-super dejagnu"
+centos_version=`cut -d ' ' -f 4 /etc/redhat-release`;
+case $centos_version in
+    7.*) pkgs_needed="gd-devel libpng-devel zlib-devel libselinux-devel audit-libs-devel libcap-devel nss-devel systemtap-sdt-devel libstdc++-static glibc-static readline-devel ncurses-devel xz-devel rpm-devel expat-devel python-devel texinfo texinfo-tex texlive-ec texlive-cm-super dejagnu";;
+    8.*) pkgs_needed="gd-devel libpng-devel zlib-devel libselinux-devel audit-libs-devel libcap-devel nss-devel systemtap-sdt-devel readline-devel ncurses-devel xz-devel rpm-devel expat-devel python36-debug info texlive";;
+esac
 
 pkgfail=false;
 nopkg=false;
