@@ -18,52 +18,208 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.  */
 
+opt_with_rpm_default="--without-rpm"
+opt_with_expat_default="--without-expat"
+
 usage()
 {
-	echo >&2 "Usage: `basename $0` [-b [-k]] --prefix=<DIR> --with-pip=<PIP_DIR>"
-	echo >&2 "       `basename $0`  -i"
-#	echo >&2 "	-B      : build only, do not install, do not clean"
+	echo >&2 "Usage: `basename $0` [-b|-i] --prefix=<DIR> --with-pip=<PIP_DIR>"
+	echo >&2 "    [default] : build and install"
 	echo >&2 "	-b      : build only, do not install"
 	echo >&2 "	-i      : install only, do not build"
 	exit 2
 }
 
+prefixdir=
+pipdir=
+program_prefix=
 
-echo "Checking required packages ... "
+do_build=true
+do_install=true
+do_clean=true
 
+do_check=false
+packages=
+
+while [ x"$1" != x ]; do
+    arg=$1
+    case $arg in
+	-b)	do_install=false; do_clean=false;;
+	-k)	do_install=false;;
+	-i)	do_build=false;;
+	--prefix=*)   installdir=`expr "${arg}" : "--prefix=\(.*\)"`;;
+	--with-pip=*) pipdir=`expr "${arg}" : "--with-pip=\(.*\)"`;
+	              program_prefix=--program-prefix=pip-
+		      ;;
+	--missing) do_check=true;;
+	--package=*)  packages="${packages} `expr "${arg}" : "--package=\(.*\)"`";;
+	*)      usage;;
+    esac
+    shift
+done
+
+if $do_check; then
+    if [ x"${packages}" != x ]; then
+	echo >&2 "'--missing' and '--packages' cannot be specified at once"
+	exit 1
+    fi
+fi
+
+curdir=`dirname $0`
+cppflags=
+cflags=
+
+wget_and_install () {
+    modname=$1
+    url=$2
+    w_and_i_dir=${curdir}/../wget-install
+    tarball=`basename $url`
+    mod_ver=`expr "${tarball}" : ".*\(${modname}-[0-9]*.[0-9]*\)"`
+    ( 	set -x; \
+	if ! [ -d ${w_and_i_dir} ]; then \
+	    mkdir -p ${w_and_i_dir}; \
+	fi; \
+	cd ${w_and_i_dir}; \
+	if [ -d ${modname} ]; then rm -f -r ${modname}; fi; \
+	mkdir -p ${modname}; \
+	cd ${modname}; \
+	wget ${url}; \
+	tar xzf ${tarball}; \
+	cd ${mod_ver}; \
+	./configure --prefix=${installdir}; \
+	make; \
+	make install; \
+    )
+    if [ -d ${installdir}/bin ]; then
+	export PATH=${installdir}/bin:${PATH}
+    fi
+    if [ -d ${installdir}/include ]; then
+	if [ x"${cppflags}" == x ]; then
+	    cppflags="-I${installdir}/include"
+	else
+	    cppflags="${cppflags},-I${installdir}/include"
+	fi
+    fi
+    if [ -d ${installdir}/lib ]; then
+	ccflags="-L${installdir}/lib ${ccflags}"
+	if [ x"${ldflags}" == x ]; then
+	    ldflags="-rpath=${installdir}/lib"
+	else
+	    ldflags="${ldflags},-rpath=${installdir}/lib"
+	fi
+    fi
+}
+
+build_flags () {
+    installdir=$1
+    if [ -d ${installdir}/bin ]; then
+	export PATH=${installdir}/bin:${PATH}
+    fi
+    if [ -d ${installdir}/include ]; then
+	if [ x"${cppflags}" == x ]; then
+	    cppflags="-I${installdir}/include"
+	else
+	    cppflags="${cppflags},-I${installdir}/include"
+	fi
+    fi
+    if [ -d ${installdir}/lib ]; then
+	ccflags="-L${installdir}/lib ${ccflags}"
+	if [ x"${ldflags}" == x ]; then
+	    ldflags="-rpath=${installdir}/lib"
+	else
+	    ldflags="${ldflags},-rpath=${installdir}/lib"
+	fi
+    fi
+}
+
+pkgfail=false;
+
+echo >&2 -n "Checking texinfo .. "
+instdir=/usr
+flag_installed=false
+for pkg in $packages; do
+    name=`expr "${pkg}" : "\([^:]*\)"`
+    if [ $name == "texinfo" ]; then
+	instdir=`expr "${pkg}" : "[^:]:\(.*\)"`
+	flag_installed=true
+    fi
+done
+if ! [ -x ${instdir}/bin/makeinfo ]; then
+    pkgfail=true
+    if ! $do_check; then
+	echo >&2 "seems not to be installed"
+    else
+	echo "texinfo https://ftp.gnu.org/gnu/texinfo/texinfo-5.1.tar.gz"
+    fi
+else
+    echo >&2 "OK"
+    if $flag_installed; then
+	build_flags $instdir
+    fi
+fi
+
+echo >&2 -n "Checking readline .. "
+instdir=/usr
+flag_installed=false
+for pkg in $packages; do
+    name=`expr "${pkg}" : "\([^:]*\)"`
+    if [ $name == "readline" ]; then
+	instdir=`expr "${pkg}" : "[^:]:\(.*\)"`
+	flag_installed=true
+    fi
+done
+if ! [ -f ${instdir}/include/readline/readline.h ]; then
+    pkgfail=true
+    if ! $do_check; then
+	echo >&2 "seems not to be installed"
+    else
+	echo "readline https://ftp.gnu.org/gnu/readline/readline-6.2.tar.gz"
+    fi
+else
+    echo >&2 "OK"
+    if $flag_installed; then
+	build_flags $instdir
+    fi
+fi
+
+echo >&2 "Checking other required packages ... "
 centos_version=`cut -d ' ' -f 4 /etc/redhat-release`;
 case $centos_version in
     7.*) pkgs_needed="gd-devel libpng-devel zlib-devel libselinux-devel audit-libs-devel libcap-devel nss-devel systemtap-sdt-devel libstdc++-static glibc-static readline-devel ncurses-devel xz-devel rpm-devel expat-devel python-devel texinfo texinfo-tex texlive-ec texlive-cm-super dejagnu";;
     8.*) pkgs_needed="gd-devel libpng-devel zlib-devel libselinux-devel audit-libs-devel libcap-devel nss-devel systemtap-sdt-devel readline-devel ncurses-devel xz-devel rpm-devel expat-devel python36-debug info texlive";;
 esac
 
-pkgfail=false;
-nopkg=false;
 for pkgn in $pkgs_needed; do
-    if ! yum info $pkgn >/dev/null 2>&1; then
+    if ! yum list installed $pkgn >/dev/null 2>&1; then
 	pkgfail=true;
-	echo "'$pkgn' package is not installed but required"
+	echo >&2 "'$pkgn' package is not installed but required"
     fi
 done
-if [ $pkgfail == false ]; then
-    echo "All required packages found"
+
+if $do_check; then
+    exit 0
+elif $pkgfail ; then
+    echo >&2 "Some packages are missing and installation is aborted"
+    exit 1;
+else
+    echo >&2 "All required packages found"
 fi
 
-do_clean=true
-do_build=true
-do_install=true
+if [ x"${installdir}" == x -o x"${pipdir}" == x ]; then
+    usage;
+fi
 
 case `uname -m` in
 aarch64)
 	opt_werror=--disable-werror
-	opt_with_rpm=--with-rpm=librpm.so.3
+	opt_with_rpm=${opt_with_rpm_default} #--with-rpm=librpm.so.3
 	opt_inprocess_agent=-disable-inprocess-agent
 	opt_host_arch=
 	host=aarch64-redhat-linux-gnu
 	;;
 x86_64)
 	opt_werror=--enable-werror
-	opt_with_rpm=--with-rpm
+	opt_with_rpm=${opt_with_rpm_default} #--with-rpm
 	opt_inprocess_agent=-enable-inprocess-agent
 	opt_host_arch='-m64 -mtune=generic'
 	host=x86_64-redhat-linux-gnu
@@ -74,37 +230,11 @@ esac
 : ${EXTRA_CONFIGURE_OPTIONS="${opt_werror} ${opt_with_rpm} ${opt_inprocess_agent} --enable-targets=s390-linux-gnu,powerpc-linux-gnu,powerpcle-linux-gnu"}
 : ${EXTRA_GCC_OPTIONS="-fstack-protector-strong -grecord-gcc-switches"}
 
-program_prefix=
-case $@ in
-*--with-pip*)
-	program_prefix=--program-prefix=pip-
-	;;
-esac
-if [ x$program_prefix == x ]; then
-    usage;
+if [ x"${cppflags}" != x ]; then
+    cppflags="-Wp,${cppflags}"
 fi
-
-# -B -b, and -i have to be first option.
-case "$1" in
--B)	do_install=false; do_clean=false; shift;;
--b)	do_install=false; shift;;
--i)	do_build=false; shift;;
-esac
-
-if $do_build; then
-	case $# in
-	0)	usage;;
-	*)	:;;
-	esac
-else
-	case $# in
-	0)	:;;
-	*)	usage;;
-	esac
-fi
-
-if [ $pkgfail == true ]; then
-    exit 1;
+if [ x"${ldflags}" != x ]; then
+    ldflags="-Wl,${ldflags}"
 fi
 
 set -x
@@ -123,7 +253,7 @@ if $do_build; then
 		--disable-sim \
 		--disable-rpath \
 		--with-system-readline \
-		--with-expat \
+		${opt_with_expat_default} \
 		--without-libexpat-prefix \
 		--enable-tui \
 		--without-python \
@@ -133,15 +263,17 @@ if $do_build; then
 		--with-auto-load-dir='$debugdir:$datadir/auto-load' \
 		--with-auto-load-safe-path='$debugdir:$datadir/auto-load:/usr/bin/mono-gdb.py' \
 		${EXTRA_CONFIGURE_OPTIONS} \
-		"$@" ${program_prefix} \
+		--prefix=${installdir} ${program_prefix} \
 		${host} \
 	    &&
 
-	make -j ${BUILD_PARALLELISM} "CFLAGS=-O2 -g -pipe -Wall \
-		-fexceptions \
-		--param=ssp-buffer-size=4 \
-		${opt_host_arch} \
-		${EXTRA_GCC_OPTIONS}" \
+	make -j ${BUILD_PARALLELISM} \
+	        "CFLAGS=-O2 -g -pipe -Wall \
+		 ${cppflags} ${ccflags} ${ldflags} \
+		 -fexceptions \
+		 --param=ssp-buffer-size=4 \
+		 ${opt_host_arch} \
+		 ${EXTRA_GCC_OPTIONS}" \
 		"LDFLAGS=-Wl,-z,relro" \
 		maybe-configure-gdb \
 	    &&
@@ -150,17 +282,19 @@ if $do_build; then
 		gdb/config.status \
 	    &&
 
-	make -j ${BUILD_PARALLELISM} "CFLAGS=-O2 -g -pipe -Wall \
-		-Wp,-D_FORTIFY_SOURCE=2 \
-		-fexceptions \
-		--param=ssp-buffer-size=4 \
-		${opt_host_arch} \
-		${EXTRA_GCC_OPTIONS}" \
+	make -j ${BUILD_PARALLELISM} \
+	        "CFLAGS=-O2 -g -pipe -Wall \
+		 ${cppflags} ${ccflags} ${ldflags} \
+		 -Wp,-D_FORTIFY_SOURCE=2 \
+		 -fexceptions \
+		 --param=ssp-buffer-size=4 \
+		 ${opt_host_arch} \
+		 ${EXTRA_GCC_OPTIONS}" \
 		"LDFLAGS=-Wl,-z,relro"
 
 else
 	true
-fi &&
+fi
 
 if $do_install; then
 

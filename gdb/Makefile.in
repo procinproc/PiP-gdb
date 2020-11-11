@@ -938,7 +938,8 @@ COMMON_OBS = $(DEPFILES) $(CONFIG_OBS) $(YYOBJ) \
 
 TSOBS = inflow.o
 
-SUBDIRS = doc @subdirs@ data-directory $(GNULIB_BUILDDIR)
+##AH## SUBDIRS = doc @subdirs@ data-directory $(GNULIB_BUILDDIR)
+SUBDIRS = @subdirs@ data-directory $(GNULIB_BUILDDIR)
 CLEANDIRS = $(SUBDIRS)
 
 # List of subdirectories in the build tree that must exist.
