@@ -51,6 +51,7 @@ while [ x"$1" != x ]; do
 	--with-pip=*) pipdir=`expr "${arg}" : "--with-pip=\(.*\)"`;
 	              program_prefix=--program-prefix=pip-
 		      ;;
+	--with-glibc-libdir=*) true;;
 	--missing) do_check=true;;
 	--package=*)  packages="${packages} `expr "${arg}" : "--package=\(.*\)"`";;
 	*)      usage;;
