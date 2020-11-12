@@ -141,8 +141,9 @@ flag_installed=false
 for pkg in $packages; do
     name=`expr "${pkg}" : "\([^:]*\)"`
     if [ $name == "texinfo" ]; then
-	instdir=`expr "${pkg}" : "[^:]:\(.*\)"`
+	instdir=`expr "${pkg}" : "[^:]*:\(.*\)"`
 	flag_installed=true
+	break;
     fi
 done
 if ! [ -x ${instdir}/bin/makeinfo ]; then
@@ -165,8 +166,9 @@ flag_installed=false
 for pkg in $packages; do
     name=`expr "${pkg}" : "\([^:]*\)"`
     if [ $name == "readline" ]; then
-	instdir=`expr "${pkg}" : "[^:]:\(.*\)"`
+	instdir=`expr "${pkg}" : "[^:]*:\(.*\)"`
 	flag_installed=true
+	break;
     fi
 done
 if ! [ -f ${instdir}/include/readline/readline.h ]; then
