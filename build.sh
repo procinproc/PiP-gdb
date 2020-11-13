@@ -188,22 +188,21 @@ fi
 echo >&2 "Checking other required packages ... "
 centos_version=`cut -d ' ' -f 4 /etc/redhat-release`;
 case $centos_version in
-    7.*) pkgs_needed="gd-devel libpng-devel zlib-devel libselinux-devel audit-libs-devel libcap-devel nss-devel systemtap-sdt-devel libstdc++-static glibc-static readline-devel ncurses-devel xz-devel rpm-devel expat-devel python-devel texinfo texinfo-tex texlive-ec texlive-cm-super dejagnu";;
-    8.*) pkgs_needed="gd-devel libpng-devel zlib-devel libselinux-devel audit-libs-devel libcap-devel nss-devel systemtap-sdt-devel readline-devel ncurses-devel xz-devel rpm-devel expat-devel python36-debug info texlive";;
+    7.*) pkgs_needed="gd-devel libpng-devel zlib-devel libselinux-devel audit-libs-devel libcap-devel nss-devel systemtap-sdt-devel libstdc++-static glibc-static ncurses-devel xz-devel rpm-devel expat-devel python-devel texinfo-tex texlive-ec texlive-cm-super dejagnu";;
+    8.*) pkgs_needed="gd-devel libpng-devel zlib-devel libselinux-devel audit-libs-devel libcap-devel nss-devel systemtap-sdt-devel ncurses-devel xz-devel rpm-devel expat-devel python36-debug info texlive";;
 esac
 
 for pkgn in $pkgs_needed; do
     if ! yum list installed $pkgn >/dev/null 2>&1; then
 	pkgfail=true;
-	echo >&2 "'$pkgn' package is not installed but required"
+	echo >&2 "'$pkgn' package is not installed"
     fi
 done
 
 if $do_check; then
     exit 0
 elif $pkgfail ; then
-    echo >&2 "Some packages are missing and installation is aborted"
-    exit 1;
+    echo >&2 "WARNING: Some packages are missing and installation might be failed"
 else
     echo >&2 "All required packages found"
 fi
