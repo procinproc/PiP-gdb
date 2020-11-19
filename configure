@@ -6233,8 +6233,9 @@ if test "${with_pip+set}" = set; then :
 fi
 
 case "$with_pip" in
-yes)	if test -f /usr/local/include/pip.h; then with_pip=/usr/local
-	elif test -f /usr/pkg/include/pip.h; then with_pip=/usr/pkg
+yes)	if   test -f /usr/local/lib/libpip.so;   then with_pip=/usr/local
+	elif test -f /usr/local/lib64/libpip.so; then with_pip=/usr/local
+	elif test -f /usr/pkg/include/pip.h;     then with_pip=/usr/pkg ##AH##  NetBSD ???
 	else with_pip=/usr
 	fi;;
 '')	with_pip=no;;	# default is "no"
@@ -6242,11 +6243,11 @@ esac
 if test x"${with_pip}" = x"no"; then
   { $as_echo "$as_me:${as_lineno-$LINENO}: result: disabled" >&5
 $as_echo "disabled" >&6; }
-elif test -f "${with_pip}/include/pip.h"; then
+elif test -f "${with_pip}/lib/libpip.so" || test -f "${with_pip}/lib64/libpip.so" ; then
   { $as_echo "$as_me:${as_lineno-$LINENO}: result: ${with_pip}" >&5
 $as_echo "${with_pip}" >&6; }
 else
-  as_fn_error "can't find \"${with_pip}/include/pip.h\"" "$LINENO" 5
+  as_fn_error "can't find \"${with_pip}/lib(64)/libpip.so\"" "$LINENO" 5
 fi
 
 

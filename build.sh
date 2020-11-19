@@ -48,7 +48,7 @@ while [ x"$1" != x ]; do
 	-k)	do_install=false;;
 	-i)	do_build=false;;
 	--prefix=*)   installdir=`expr "${arg}" : "--prefix=\(.*\)"`;;
-	--with-pip=*) pipdir=`expr "${arg}" : "--with-pip=\(.*\)"`;
+	--with-pip=*) withpip=$arg
 	              program_prefix=--program-prefix=pip-
 		      ;;
 	--with-glibc-libdir=*) true;;
@@ -69,47 +69,6 @@ fi
 curdir=`dirname $0`
 cppflags=
 cflags=
-
-wget_and_install () {
-    modname=$1
-    url=$2
-    w_and_i_dir=${curdir}/../wget-install
-    tarball=`basename $url`
-    mod_ver=`expr "${tarball}" : ".*\(${modname}-[0-9]*.[0-9]*\)"`
-    ( 	set -x; \
-	if ! [ -d ${w_and_i_dir} ]; then \
-	    mkdir -p ${w_and_i_dir}; \
-	fi; \
-	cd ${w_and_i_dir}; \
-	if [ -d ${modname} ]; then rm -f -r ${modname}; fi; \
-	mkdir -p ${modname}; \
-	cd ${modname}; \
-	wget ${url}; \
-	tar xzf ${tarball}; \
-	cd ${mod_ver}; \
-	./configure --prefix=${installdir}; \
-	make; \
-	make install; \
-    )
-    if [ -d ${installdir}/bin ]; then
-	export PATH=${installdir}/bin:${PATH}
-    fi
-    if [ -d ${installdir}/include ]; then
-	if [ x"${cppflags}" == x ]; then
-	    cppflags="-I${installdir}/include"
-	else
-	    cppflags="${cppflags},-I${installdir}/include"
-	fi
-    fi
-    if [ -d ${installdir}/lib ]; then
-	ccflags="-L${installdir}/lib ${ccflags}"
-	if [ x"${ldflags}" == x ]; then
-	    ldflags="-rpath=${installdir}/lib"
-	else
-	    ldflags="${ldflags},-rpath=${installdir}/lib"
-	fi
-    fi
-}
 
 build_flags () {
     installdir=$1
@@ -207,8 +166,13 @@ else
     echo >&2 "All required packages found"
 fi
 
-if [ x"${installdir}" == x -o x"${pipdir}" == x ]; then
+if [ x"${installdir}" == x -o x"${withpip}" == x ]; then
     usage;
+fi
+
+pipdir=`expr "${withpip}" : "--with-pip=\(.*\)"`;
+if ! [ -x ${$pipdir}/lib/libpip.so ]; then
+    echo >&2 "${pipdir} seems not to be PiP directory"
 fi
 
 case `uname -m` in
@@ -266,6 +230,7 @@ if $do_build; then
 		--with-auto-load-safe-path='$debugdir:$datadir/auto-load:/usr/bin/mono-gdb.py' \
 		${EXTRA_CONFIGURE_OPTIONS} \
 		--prefix=${installdir} ${program_prefix} \
+	        ${withpip} \
 		${host} \
 	    &&
 

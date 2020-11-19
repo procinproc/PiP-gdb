@@ -6111,13 +6111,18 @@ default_pkgversion=GDB
 if test x"${with_pip}" = x"no"; then
   { $as_echo "$as_me:${as_lineno-$LINENO}: result: disabled" >&5
 $as_echo "disabled" >&6; }
-elif test -f "${with_pip}/include/pip.h"; then
+elif test -f "${with_pip}/include/pip_gdbif_offsets.h"; then
   { $as_echo "$as_me:${as_lineno-$LINENO}: result: ${with_pip}" >&5
 $as_echo "${with_pip}" >&6; }
   CPPFLAGS="$CPPFLAGS -DENABLE_PIP -I${with_pip}/include"
   default_pkgversion=PiP-GDB
+elif test -f "${with_pip}/include/pip/pip_gdbif_offsets.h"; then
+  { $as_echo "$as_me:${as_lineno-$LINENO}: result: ${with_pip}" >&5
+$as_echo "${with_pip}" >&6; }
+  CPPFLAGS="$CPPFLAGS -DENABLE_PIP -I${with_pip}/include/pip"
+  default_pkgversion=PiP-GDB
 else
-  as_fn_error "can't find \"${with_pip}/include/pip.h\"" "$LINENO" 5
+  as_fn_error "can't find \"${with_pip}/(pip/)include/pip_gdbif_offsets.h\"" "$LINENO" 5
 fi
 
 

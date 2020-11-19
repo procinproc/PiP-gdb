@@ -137,8 +137,9 @@ AC_ARG_WITH([pip],
   [AS_HELP_STRING([--with-pip@<:@=DIR@:>@],
 	          [specify prefix directory for the installed PiP package])])
 case "$with_pip" in
-yes)	if test -f /usr/local/include/pip.h; then with_pip=/usr/local
-	elif test -f /usr/pkg/include/pip.h; then with_pip=/usr/pkg
+yes)	if   test -f /usr/local/lib/libpip.so;   then with_pip=/usr/local
+	elif test -f /usr/local/lib64/libpip.so; then with_pip=/usr/local
+	elif test -f /usr/pkg/include/pip.h;     then with_pip=/usr/pkg ##AH##  NetBSD ???
 	else with_pip=/usr
 	fi;;
 '')	with_pip=no;;	# default is "no"
@@ -146,8 +147,9 @@ esac
 pip_site_exp="proc skip_pip_tests {} { return 1; }"
 if test x"${with_pip}" = x"no"; then
   AC_MSG_RESULT([disabled])
-elif test -f "${with_pip}/include/pip.h"; then
+elif test -f "${with_pip}/include/pip_gdbif_offsets.h"; then
   AC_MSG_RESULT([${with_pip}])
+  CPPFLAGS="$CPPFLAGS -DENABLE_PIP -I${with_pip}/include"
   CPPFLAGS="$CPPFLAGS -DENABLE_PIP -I${with_pip}/include"
   pie_cflags='-fPIE'
   pie_ldflags='-pie -rdynamic'
@@ -159,8 +161,21 @@ set pip_cppflags \\\"-I${with_pip}/include\\\"|\\
 set pip_cflags \\\"${pie_cflags} -pthread\\\"|\\
 set pip_ldflags \\\"${pie_ldflags} -pthread -Wl,--dynamic-linker=${pip_dynamic_linker}\\\"|\\
 set pip_libs \\\"-L${with_pip}/lib -Wl,-rpath=${with_pip}/lib -lpip -ldl\\\""
+elif test -f "${with_pip}/include/pip/pip_gdbif_offsets.h"; then
+  AC_MSG_RESULT([${with_pip}])
+  CPPFLAGS="$CPPFLAGS -DENABLE_PIP -I${with_pip}/include/pip"
+  pie_cflags='-fPIE'
+  pie_ldflags='-pie -rdynamic'
+  pip_site_exp="\\
+proc skip_pip_tests {} { return 0; }|\\
+set pie_cflags \\\"${pie_cflags}\\\"|\\
+set pie_ldflags \\\"${pie_ldflags}\\\"|\\
+set pip_cppflags \\\"-I${with_pip}/include\\\"|\\
+set pip_cflags \\\"${pie_cflags} -pthread\\\"|\\
+set pip_ldflags \\\"${pie_ldflags} -pthread -Wl,--dynamic-linker=${pip_dynamic_linker}\\\"|\\
+set pip_libs \\\"-L${with_pip}/lib -Wl,-rpath=${with_pip}/lib -lpip -ldl\\\""
 else
-  AC_MSG_ERROR([can't find "${with_pip}/include/pip.h"])
+  AC_MSG_ERROR([can't find "${with_pip}/(pip/)include/pip_gdbif_offsets.h"])
 fi
 AC_SUBST(with_pip)
 AC_SUBST(pip_site_exp)
