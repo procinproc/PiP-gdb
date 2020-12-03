@@ -2,6 +2,10 @@
 
    Copyright (C) 2000-2018 Free Software Foundation, Inc.
 
+   Copyright of the PiP-related portions is:
+   $RIKEN_copyright: 2018 Riken Center for Computational Sceience, 
+	  System Software Devlopment Team. All rights researved$
+
    This file is part of GDB.
 
    This program is free software; you can redistribute it and/or modify
@@ -106,5 +110,9 @@ extern struct link_map_offsets *svr4_lp64_fetch_link_map_offsets (void);
 /* Return 1 if PC lies in the dynamic symbol resolution code of the
    SVR4 run time loader.  */
 int svr4_in_dynsym_resolve_code (CORE_ADDR pc);
+
+#ifdef ENABLE_PIP
+extern int pip_scan_inferiors (void);
+#endif
 
 #endif /* solib-svr4.h */

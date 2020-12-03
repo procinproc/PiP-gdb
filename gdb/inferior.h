@@ -3,6 +3,10 @@
 
    Copyright (C) 1986-2018 Free Software Foundation, Inc.
 
+   Copyright of the PiP-related portions is:
+   $RIKEN_copyright: 2018 Riken Center for Computational Sceience, 
+	  System Software Devlopment Team. All rights researved$
+
    This file is part of GDB.
 
    This program is free software; you can redistribute it and/or modify
@@ -338,6 +342,12 @@ public:
 
   /* The highest thread number this inferior ever had.  */
   int highest_thread_num = 0;
+
+#ifdef ENABLE_PIP
+  int pipid;
+  CORE_ADDR pip_load_address;
+  gdb::unique_xmalloc_ptr<char> pip_pathname;
+#endif
 
   /* State of GDB control of inferior process execution.
      See `struct inferior_control_state'.  */

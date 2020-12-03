@@ -362,6 +362,7 @@ handle_command_errors (struct gdb_exception e)
   return 1;
 }
 
+#ifndef ENABLE_PIP
 /* Type of the command callback passed to the const
    catch_command_errors.  */
 
@@ -369,7 +370,9 @@ typedef void (catch_command_errors_const_ftype) (const char *, int);
 
 /* Wrap calls to commands run before the event loop is started.  */
 
-static int
+static
+#endif
+int
 catch_command_errors (catch_command_errors_const_ftype command,
 		      const char *arg, int from_tty)
 {

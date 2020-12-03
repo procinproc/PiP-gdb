@@ -2,6 +2,10 @@
 
    Copyright (C) 2008-2018 Free Software Foundation, Inc.
 
+   Copyright of the PiP-related portions is:
+   $RIKEN_copyright: 2018 Riken Center for Computational Sceience,
+	  System Software Devlopment Team. All rights researved$
+
    This file is part of GDB.
 
    This program is free software; you can redistribute it and/or modify
@@ -36,6 +40,13 @@
 #include "target-descriptions.h"
 #include "readline/tilde.h"
 #include "progspace-and-thread.h"
+
+#ifdef ENABLE_PIP
+#include <pip_gdbif_enums.h>
+#include <pip_gdbif_offsets.h>
+
+#include "solib-svr4.h" /* pip_scan_inferiors () */
+#endif
 
 /* Keep a registry of per-inferior data-pointers required by other GDB
    modules.  */
@@ -273,6 +284,12 @@ inferior_appeared (struct inferior *inf, int pid)
   inf->has_exit_code = 0;
   inf->exit_code = 0;
 
+#ifdef ENABLE_PIP
+  inf->pipid = PIP_GDBIF_PIPID_ANY;
+  inf->pip_load_address = 0;
+  inf->pip_pathname = NULL;
+#endif
+
   gdb::observers::inferior_appeared.notify (inf);
 }
 
@@ -462,6 +479,24 @@ inferior_pid_to_str (int pid)
     return _("<null>");
 }
 
+#ifdef ENABLE_PIP
+static const char *
+inferior_id_string (struct inferior *inf)
+{
+  static char buf[80];
+  const char *pid_string = inferior_pid_to_str (inf->pid);
+
+  if (inf->pipid == PIP_GDBIF_PIPID_ANY)
+    return pid_string;
+
+  if (inf->pipid == PIP_GDBIF_PIPID_ROOT)
+    snprintf (buf, sizeof buf, "%s (pip root)", pid_string);
+  else
+    snprintf (buf, sizeof buf, "%s (pip %d)", pid_string, inf->pipid);
+  return buf;
+}
+#endif /* ENABLE_PIP */
+
 /* See inferior.h.  */
 
 void
@@ -474,7 +509,11 @@ print_selected_inferior (struct ui_out *uiout)
     filename = _("<noexec>");
 
   uiout->message (_("[Switching to inferior %d [%s] (%s)]\n"),
+#ifdef ENABLE_PIP
+		  inf->num, inferior_id_string (inf), filename);
+#else
 		  inf->num, inferior_pid_to_str (inf->pid), filename);
+#endif
 }
 
 /* Prints the list of inferiors and their details on UIOUT.  This is a
@@ -505,10 +544,21 @@ print_inferior (struct ui_out *uiout, const char *requested_inferiors)
       return;
     }
 
+#ifdef ENABLE_PIP
+  /*
+   * invoking "info inferiors" at PiP root task updates PiP task lists
+   */
+  (void) pip_scan_inferiors ();
+#endif
+
   ui_out_emit_table table_emitter (uiout, 4, inf_count, "inferiors");
   uiout->table_header (1, ui_left, "current", "");
   uiout->table_header (4, ui_left, "number", "Num");
+#ifdef ENABLE_PIP
+  uiout->table_header (24, ui_left, "target-id", "Description");
+#else
   uiout->table_header (17, ui_left, "target-id", "Description");
+#endif
   uiout->table_header (17, ui_left, "exec", "Executable");
 
   uiout->table_body ();
@@ -526,7 +576,11 @@ print_inferior (struct ui_out *uiout, const char *requested_inferiors)
 
       uiout->field_int ("number", inf->num);
 
+#ifdef ENABLE_PIP
+      uiout->field_string ("target-id", inferior_id_string (inf));
+#else      
       uiout->field_string ("target-id", inferior_pid_to_str (inf->pid));
+#endif
 
       if (inf->pspace->pspace_exec_filename != NULL)
 	uiout->field_string ("exec", inf->pspace->pspace_exec_filename);
@@ -699,7 +753,7 @@ remove_inferior_command (const char *args, int from_tty)
 	  warning (_("Can not remove current inferior %d."), num);
 	  continue;
 	}
-    
+
       if (inf->pid != 0)
 	{
 	  warning (_("Can not remove active inferior %d."), num);

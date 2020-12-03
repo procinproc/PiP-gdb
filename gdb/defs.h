@@ -288,6 +288,12 @@ struct value;
    globals that are currently only available to main.c.  */
 extern char *relocate_gdb_directory (const char *initial, int flag);
 
+#ifdef ENABLE_PIP
+typedef void (catch_command_errors_const_ftype) (const char *, int);
+int catch_command_errors (catch_command_errors_const_ftype command,
+			  const char *arg, int from_tty);
+#endif
+
 
 /* Annotation stuff.  */
 

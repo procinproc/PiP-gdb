@@ -1,0 +1,74 @@
+# $RIKEN_copyright: 2018 Riken Center for Computational Sceience, 
+# 	  System Software Devlopment Team. All rights researved$
+#
+# This program is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation; either version 2 of the License, or
+# (at your option) any later version.
+# 
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+# 
+# You should have received a copy of the GNU General Public License
+# along with this program; if not, write to the Free Software
+# Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.  
+
+if { [skip_pip_tests] } { return -1 }
+
+set testfile    threads
+set executable  gdb_test
+set executable2 sleep
+set srcfile     ${srcdir}/${subdir}/${executable}.c
+set srcfile2    ${srcdir}/${subdir}/${executable2}.c
+set binfile     ${objdir}/${subdir}/${executable}
+set binfile2    ${objdir}/${subdir}/${executable2}
+
+set pie_cc_opt "debug"
+set pie_cc_opt [concat $pie_cc_opt [list "additional_flags=${pie_cflags} ${pie_ldflags}"]]
+
+set pip_cc_opt "debug"
+set pip_cc_opt [concat $pip_cc_opt [list "additional_flags=${pip_cppflags} ${pip_cflags} ${pip_ldflags}"]]
+set pip_cc_opt [concat $pip_cc_opt [list libs=${pip_libs}]]
+
+if { [gdb_compile ${srcfile}  ${binfile}  executable "${pip_cc_opt}" ] != ""} {
+    untested "Could not compile ${binfile} w/ ${pip_cc_opt}."
+    return -1
+}
+
+if { [gdb_compile ${srcfile2} ${binfile2} executable "${pie_cc_opt}"] != "" } {
+    untested "Could not compile ${binfile2} w/ ${pie_cc_opt}."
+    return -1
+}
+
+set env(PIP_MODE) pthread
+set rootpid [eval exec $binfile &]
+
+# The process must be spawned.
+exec sleep 5
+
+set use_gdb_stub 0
+set timeout 1000
+
+set test "attach to PIP task"
+
+gdb_exit
+gdb_start
+
+# Attach test.
+gdb_test "attach ${rootpid}" ".*Attaching to process $rootpid.*"
+
+# info threads test.
+gdb_test "info threads" ".*  2 .* Thread .*"
+
+gdb_test "thread 2" ".*Switching to thread 2.*"
+
+gdb_test "info threads" ".*\\* 2 .* Thread .*"
+
+# Detach test.
+gdb_test "detach" "process $rootpid.*"
+
+# The process must be exit.
+exec sleep 10
+exec kill $rootpid
