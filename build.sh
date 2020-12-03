@@ -171,7 +171,7 @@ if [ x"${installdir}" == x -o x"${withpip}" == x ]; then
 fi
 
 pipdir=`expr "${withpip}" : "--with-pip=\(.*\)"`;
-if ! [ -x ${$pipdir}/lib/libpip.so ]; then
+if ! [ -x ${pipdir}/lib/libpip.so ]; then
     echo >&2 "${pipdir} seems not to be PiP directory"
 fi
 
