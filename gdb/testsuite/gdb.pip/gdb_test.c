@@ -20,9 +20,9 @@
   * Written by Atsushi HORI <ahori@riken.jp>, 2016
 */
 
-#include <pip.h>
+#include <pip/pip.h>
 #ifdef AH
-#include <pip_debug.h> /* DBGF */
+#include <pip/pip_debug.h> /* DBGF */
 #else
 #ifdef DEBUG
 #define DBGF(...)  \

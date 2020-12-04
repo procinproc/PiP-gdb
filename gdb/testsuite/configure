@@ -2308,7 +2308,7 @@ pip_site_exp="proc skip_pip_tests {} { return 1; }"
 if test x"${with_pip}" = x"no"; then
   { $as_echo "$as_me:${as_lineno-$LINENO}: result: disabled" >&5
 $as_echo "disabled" >&6; }
-elif test -f "${with_pip}/include/pip.h"; then
+elif test -f "${with_pip}/include/pip/pip.h"; then
   { $as_echo "$as_me:${as_lineno-$LINENO}: result: ${with_pip}" >&5
 $as_echo "${with_pip}" >&6; }
   CPPFLAGS="$CPPFLAGS -DENABLE_PIP -I${with_pip}/include"
@@ -2323,7 +2323,7 @@ set pip_cflags \\\"${pie_cflags} -pthread\\\"|\\
 set pip_ldflags \\\"${pie_ldflags} -pthread -Wl,--dynamic-linker=${pip_dynamic_linker}\\\"|\\
 set pip_libs \\\"-L${with_pip}/lib -Wl,-rpath=${with_pip}/lib -lpip -ldl\\\""
 else
-  as_fn_error $? "can't find \"${with_pip}/include/pip.h\"" "$LINENO" 5
+  as_fn_error $? "can't find \"${with_pip}/include/pip/pip.h\"" "$LINENO" 5
 fi
 
 
