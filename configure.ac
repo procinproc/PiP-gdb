@@ -1508,18 +1508,22 @@ AC_ARG_WITH([pip],
   [AS_HELP_STRING([--with-pip@<:@=DIR@:>@],
 	          [specify prefix directory for the installed PiP package])])
 case "$with_pip" in
-yes)	if test -f /usr/local/include/pip/pip.h; then with_pip=/usr/local
-	elif test -f /usr/pkg/include/pip/pip.h; then with_pip=/usr/pkg
+yes)	if   test -f /usr/local/lib/libpip.so;   then with_pip=/usr/local
+	elif test -f /usr/local/lib64/libpip.so; then with_pip=/usr/local
+	elif test -f /usr/pkg/include/pip.h;     then with_pip=/usr/pkg ##AH##  NetBSD ???
 	else with_pip=/usr
 	fi;;
 '')	with_pip=no;;	# default is "no"
 esac
 if test x"${with_pip}" = x"no"; then
   AC_MSG_RESULT([disabled])
-elif test -f "${with_pip}/include/pip/pip.h"; then
+elif test -f "${with_pip}/lib/libpip.so" || test -f "${with_pip}/lib64/libpip.so" ; then
   AC_MSG_RESULT([${with_pip}])
 else
-  AC_MSG_ERROR([can't find "${with_pip}/include/pip/pip.h"])
+elif test -f "${with_pip}/lib/libpip.so" || test -f "${with_pip}/lib64/libpip.so" ; then
+  AC_MSG_RESULT([${with_pip}])
+else
+  AC_MSG_ERROR([can't find "${with_pip}/lib(64)/libpip.so"])
 fi
 AC_SUBST(with_pip)
 

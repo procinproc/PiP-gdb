@@ -358,7 +358,7 @@ extern rpmdbMatchIterator rpmtsInitIterator(const rpmts ts, rpmTag rpmtag,
     fi
   fi
 fi
- 
+
 AC_CONFIG_SUBDIRS(testsuite)
 
 # Check whether to support alternative target configurations
@@ -725,8 +725,8 @@ AC_ARG_WITH([pip],
   [AS_HELP_STRING([--with-pip@<:@=DIR@:>@],
 	          [specify prefix directory for the installed PiP package])])
 case "$with_pip" in
-yes)	if test -f /usr/local/include/pip.h; then with_pip=/usr/local
-	elif test -f /usr/pkg/include/pip.h; then with_pip=/usr/pkg
+yes)	if test -f /usr/local/lib/libpip.so; then with_pip=/usr/local
+	elif test -f /usr/pkg/lib/libpip.so; then with_pip=/usr/pkg
 	else with_pip=/usr
 	fi;;
 '')	with_pip=no;;	# default is "no"
@@ -734,12 +734,16 @@ esac
 default_pkgversion=GDB
 if test x"${with_pip}" = x"no"; then
   AC_MSG_RESULT([disabled])
-elif test -f "${with_pip}/include/pip.h"; then
+elif test -f "${with_pip}/include/pip_gdbif_offsets.h"; then
   AC_MSG_RESULT([${with_pip}])
   CPPFLAGS="$CPPFLAGS -DENABLE_PIP -I${with_pip}/include"
   default_pkgversion=PiP-GDB
+elif test -f "${with_pip}/include/pip/pip_gdbif_offsets.h"; then
+  AC_MSG_RESULT([${with_pip}])
+  CPPFLAGS="$CPPFLAGS -DENABLE_PIP -I${with_pip}/include/pip"
+  default_pkgversion=PiP-GDB
 else
-  AC_MSG_ERROR([can't find "${with_pip}/include/pip.h"])
+  AC_MSG_ERROR([can't find "${with_pip}/(pip/)include/pip_gdbif_offsets.h"])
 fi
 AC_SUBST(with_pip)
 
