@@ -208,8 +208,8 @@ set -x
 if $do_build; then
 
 	if $do_clean; then
-		make clean
-		make distclean
+		make clean || true
+		make distclean || true
 		find . -name config.cache -delete
 	fi
 
