@@ -23,7 +23,7 @@ opt_with_expat_default="--without-expat"
 
 usage()
 {
-	echo >&2 "Usage: `basename $0` [-b|-i] --prefix=<DIR> --with-pip=<PIP_DIR>"
+	echo >&2 "Usage: `basename $0` [-b|-i] --prefix=<INSTALL_DIR> --with-pip=<PIP_DIR>"
 	echo >&2 "    [default] : build and install"
 	echo >&2 "	-b      : build only, do not install"
 	echo >&2 "	-i      : install only, do not build"

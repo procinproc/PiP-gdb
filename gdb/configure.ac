@@ -714,8 +714,8 @@ AC_ARG_WITH([pip],
   [AS_HELP_STRING([--with-pip@<:@=DIR@:>@],
 	          [specify prefix directory for the installed PiP package])])
 case "$with_pip" in
-yes)	if test -f /usr/local/include/pip.h; then with_pip=/usr/local
-	elif test -f /usr/pkg/include/pip.h; then with_pip=/usr/pkg
+yes)	if test -f /usr/local/lib/libpip.so; then with_pip=/usr/local
+	elif test -f /usr/pkg/lib/libpip.so; then with_pip=/usr/pkg
 	else with_pip=/usr
 	fi;;
 '')	with_pip=no;;	# default is "no"
