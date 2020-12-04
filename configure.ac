@@ -1519,7 +1519,6 @@ if test x"${with_pip}" = x"no"; then
   AC_MSG_RESULT([disabled])
 elif test -f "${with_pip}/lib/libpip.so" || test -f "${with_pip}/lib64/libpip.so" ; then
   AC_MSG_RESULT([${with_pip}])
-else
 elif test -f "${with_pip}/lib/libpip.so" || test -f "${with_pip}/lib64/libpip.so" ; then
   AC_MSG_RESULT([${with_pip}])
 else
