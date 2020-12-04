@@ -20,7 +20,7 @@
 
 usage()
 {
-	echo >&2 "Usage: `basename $0` [-b [-k]] --prefix=<DIR> --with-pip=<PIP_DIR>"
+	echo >&2 "Usage: `basename $0` [<OPTION>]] --prefix=<INSTALL_DIR> --with-pip=<PIP_DIR>"
 	echo >&2 "       `basename $0`  -i"
 #	echo >&2 "	-B      : build only, do not install, do not clean"
 	echo >&2 "	-b      : build only, do not install"
