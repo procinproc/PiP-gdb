@@ -86,7 +86,7 @@ gdb_test "info inferiors" "2 .* process .* \\(pip root\\) *${escapedbinfile}.*"
 gdb_test "inferior 2" "Switching to inferior 2 \\\[process \[0-9\]* \\(pip root\\)\\\] \\(${escapedbinfile}\\)\\\].*"
 
 # switching inferior 1
-gdb_test "inferior 1" "Switching to inferior 1 \\\[process \[0-9\]* \\(pip 0\\)\\\] \\(${escapedbinfile2}\\)\\\].*"
+gdb_test "inferior 1" "Switching to inferior 1 \\\[process \[0-9\]* \\(pip 0\\)\\\] \\(.*${subdir}/${executable2}\\)\\\].*"
 
 # breakpoint test.
 gdb_test "break foo" "Breakpoint 1 at 0x\[0-9a-f]*: file ${escapedsrcfile2},.*" "break 1"
