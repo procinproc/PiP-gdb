@@ -20,16 +20,13 @@
   * Written by Atsushi HORI <ahori@riken.jp>, 2016
 */
 
+#include <pthread.h>
+#include <unistd.h>
+
 #include <pip.h>
-#ifdef AH
-#include <pip_debug.h> /* DBGF */
-#else
-#ifdef DEBUG
+#undef DBGF /* old pip_debug.h defines this */
 #define DBGF(...)  \
   do { fprintf(stderr,__VA_ARGS__); fprintf( stderr, "\n" ); } while(0)
-#endif
-#endif
-#include <unistd.h>
 
 /* from PIP/test/test.h */
 #define PRINT_FL(FSTR,V)	\
