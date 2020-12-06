@@ -23,7 +23,7 @@ opt_with_expat_default="--without-expat"
 
 usage()
 {
-	echo >&2 "Usage: `basename $0` [-b|-i] --prefix=<DIR> --with-pip=<PIP_DIR>"
+	echo >&2 "Usage: `basename $0` [-b|-i] --prefix=<DIR> --with-pip=<PIP_DIR> --with-glibc-libdir=<PIP_GLIBC_DIR>/lib"
 	echo >&2 "    [default] : build and install"
 	echo >&2 "	-b      : build only, do not install"
 	echo >&2 "	-i      : install only, do not build"
@@ -37,6 +37,8 @@ program_prefix=
 do_build=true
 do_install=true
 do_clean=true
+with_pip=
+with_glibc_libdir=
 
 do_check=false
 packages=
@@ -47,11 +49,14 @@ while [ x"$1" != x ]; do
 	-b)	do_install=false; do_clean=false;;
 	-k)	do_install=false;;
 	-i)	do_build=false;;
-	--prefix=*)   installdir=`expr "${arg}" : "--prefix=\(.*\)"`;;
-	--with-pip=*) withpip=$arg
-	              program_prefix=--program-prefix=pip-
-		      ;;
-	--with-glibc-libdir=*) true;;
+	--prefix=*)
+		installdir=`expr "${arg}" : "--prefix=\(.*\)"`;;
+	--with-pip=*)
+		with_pip=$arg
+		program_prefix=--program-prefix=pip-
+		;;
+	--with-glibc-libdir=*)
+		with_glibc_libdir=$arg;;
 	--missing) do_check=true;;
 	--package=*)  packages="${packages} `expr "${arg}" : "--package=\(.*\)"`";;
 	*)      usage;;
@@ -166,11 +171,11 @@ else
     echo >&2 "All required packages found"
 fi
 
-if [ x"${installdir}" == x -o x"${withpip}" == x ]; then
+if [ x"${installdir}" == x -o x"${with_pip}" == x ]; then
     usage;
 fi
 
-pipdir=`expr "${withpip}" : "--with-pip=\(.*\)"`;
+pipdir=`expr "${with_pip}" : "--with-pip=\(.*\)"`;
 if ! [ -x ${pipdir}/lib/libpip.so ]; then
     echo >&2 "${pipdir} seems not to be PiP directory"
 fi
@@ -230,7 +235,7 @@ if $do_build; then
 		--with-auto-load-safe-path='$debugdir:$datadir/auto-load:/usr/bin/mono-gdb.py' \
 		${EXTRA_CONFIGURE_OPTIONS} \
 		--prefix=${installdir} ${program_prefix} \
-	        ${withpip} \
+	        ${with_pip} ${with_glibc_libdir} \
 		${host} \
 	    &&
 
