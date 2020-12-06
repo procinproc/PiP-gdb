@@ -23,7 +23,7 @@ opt_with_expat_default="--without-expat"
 
 usage()
 {
-	echo >&2 "Usage: `basename $0` [-b|-i] --prefix=<DIR> --with-pip=<PIP_DIR> --with-glibc-libdir=<PIP_GLIBC_DIR>/lib"
+	echo >&2 "Usage: `basename $0` [-b|-i] --prefix=<INSTALL_DIR> --with-pip=<PIP_DIR> --with-glibc-libdir=<PIP_GLIBC_DIR>/lib"
 	echo >&2 "    [default] : build and install"
 	echo >&2 "	-b      : build only, do not install"
 	echo >&2 "	-i      : install only, do not build"
@@ -213,8 +213,8 @@ set -x
 if $do_build; then
 
 	if $do_clean; then
-		make clean
-		make distclean
+		make clean || true
+		make distclean || true
 		find . -name config.cache -delete
 	fi
 
