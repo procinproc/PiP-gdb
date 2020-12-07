@@ -37,6 +37,7 @@ program_prefix=
 do_build=true
 do_install=true
 do_clean=true
+with_pip=
 
 do_check=false
 packages=
@@ -47,11 +48,12 @@ while [ x"$1" != x ]; do
 	-b)	do_install=false; do_clean=false;;
 	-k)	do_install=false;;
 	-i)	do_build=false;;
-	--prefix=*)   installdir=`expr "${arg}" : "--prefix=\(.*\)"`;;
-	--with-pip=*) withpip=$arg
-	              program_prefix=--program-prefix=pip-
-		      ;;
-	--with-glibc-libdir=*) true;;
+	--prefix=*)
+		installdir=`expr "${arg}" : "--prefix=\(.*\)"`;;
+	--with-pip=*)
+		with_pip=$arg
+		program_prefix=--program-prefix=pip-
+		;;
 	--missing) do_check=true;;
 	--package=*)  packages="${packages} `expr "${arg}" : "--package=\(.*\)"`";;
 	*)      usage;;
@@ -230,7 +232,7 @@ if $do_build; then
 		--with-auto-load-safe-path='$debugdir:$datadir/auto-load:/usr/bin/mono-gdb.py' \
 		${EXTRA_CONFIGURE_OPTIONS} \
 		--prefix=${installdir} ${program_prefix} \
-	        ${withpip} \
+	        ${with_pip} \
 		${host} \
 	    &&
 

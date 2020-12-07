@@ -1454,79 +1454,6 @@ AC_ARG_WITH(gmp-lib,
 [AS_HELP_STRING([--with-gmp-lib=PATH],
 		[specify directory for the installed GMP library])])
 
-#
-# PiP
-#
-AC_MSG_CHECKING([for glibc libdir])
-AC_ARG_WITH([glibc-libdir],
-  [AS_HELP_STRING([--with-glibc-libdir@<:@=DIR@:>@],
-                  [specify glibc lib directory])])
-pip_glibc_libdir=
-pip_dynamic_linker=
-if test x"${with_glibc_libdir}" = x"no"; then
-  AC_MSG_RESULT([disabled])
-else
-  case "${with_glibc_libdir}" in
-  ""|yes) libdir_candidates="/lib64 /lib /libexec /usr/lib /usr/libexec";;
-  *) libdir_candidates="${with_glibc_libdir}";;
-  esac
-  ld_so_candidates=
-  for d in ${libdir_candidates}; do
-    if ld_so_candidates=`ls -d "${d}"/ld-@<:@0-9@:>@*.so 2>/dev/null`; then
-      break
-    elif ld_so_candidates=`ls -d "${d}"/ld.so.* 2>/dev/null`; then
-      break
-    elif ld_so_candidates=`ls -d "${d}"/ld-elf.so.* 2>/dev/null`; then
-      break
-    elif ld_so_candidates=`ls -d "${d}"/ld.elf_so 2>/dev/null`; then
-      break
-    fi
-  done
-  if test x"${ld_so_candidates}" != x""; then
-    ld_so=`echo "${ld_so_candidates}" | awk '{print $NF; exit}'`
-    d=`dirname "${ld_so}"`
-    if test -d "${d}" -a -x "${ld_so}"; then
-      pip_glibc_libdir="${d}"
-      pip_dynamic_linker="${ld_so}"
-      AC_MSG_RESULT([${pip_glibc_libdir}])
-    fi
-  fi
-  if test x"${pip_glibc_libdir}" = x""; then
-    if test x"${with_glibc_libdir}" = x""; then
-      AC_MSG_RESULT([no])
-    else
-      AC_MSG_ERROR([can't find ld.so.])
-    fi
-  fi
-fi
-AC_SUBST(pip_glibc_libdir)
-AC_SUBST(pip_dynamic_linker)
-
-
-AC_MSG_CHECKING([for PiP])
-AC_ARG_WITH([pip],
-  [AS_HELP_STRING([--with-pip@<:@=DIR@:>@],
-	          [specify prefix directory for the installed PiP package])])
-case "$with_pip" in
-yes)	if   test -f /usr/local/lib/libpip.so;   then with_pip=/usr/local
-	elif test -f /usr/local/lib64/libpip.so; then with_pip=/usr/local
-	elif test -f /usr/pkg/include/pip.h;     then with_pip=/usr/pkg ##AH##  NetBSD ???
-	else with_pip=/usr
-	fi;;
-'')	with_pip=no;;	# default is "no"
-esac
-if test x"${with_pip}" = x"no"; then
-  AC_MSG_RESULT([disabled])
-elif test -f "${with_pip}/lib/libpip.so" || test -f "${with_pip}/lib64/libpip.so" ; then
-  AC_MSG_RESULT([${with_pip}])
-elif test -f "${with_pip}/lib/libpip.so" || test -f "${with_pip}/lib64/libpip.so" ; then
-  AC_MSG_RESULT([${with_pip}])
-else
-  AC_MSG_ERROR([can't find "${with_pip}/lib(64)/libpip.so"])
-fi
-AC_SUBST(with_pip)
-
-
 if test "x$with_gmp" != x; then
   gmplibs="-L$with_gmp/lib $gmplibs"
   gmpinc="-I$with_gmp/include $gmpinc"
@@ -1747,6 +1674,36 @@ fi
 
 AC_SUBST(isllibs)
 AC_SUBST(islinc)
+
+#
+# PiP
+#
+AC_MSG_CHECKING([for glibc libdir])
+AC_ARG_WITH([glibc-libdir],
+  [AS_HELP_STRING([--with-glibc-libdir@<:@=DIR@:>@],
+                  [specify glibc lib directory])])
+
+AC_MSG_CHECKING([for PiP])
+AC_ARG_WITH([pip],
+  [AS_HELP_STRING([--with-pip@<:@=DIR@:>@],
+	          [specify prefix directory for the installed PiP package])])
+case "$with_pip" in
+yes)	if   test -f /usr/local/lib/libpip.so;   then with_pip=/usr/local
+	elif test -f /usr/local/lib64/libpip.so; then with_pip=/usr/local
+	elif test -f /usr/pkg/include/pip.h;     then with_pip=/usr/pkg ##AH##  NetBSD ???
+	else with_pip=/usr
+	fi;;
+'')	with_pip=no;;	# default is "no"
+esac
+if test x"${with_pip}" = x"no"; then
+  AC_MSG_RESULT([disabled])
+elif test -f "${with_pip}/lib/libpip.so" || test -f "${with_pip}/lib64/libpip.so" ; then
+  AC_MSG_RESULT([${with_pip}])
+else
+  AC_MSG_ERROR([can't find "${with_pip}/lib(64)/libpip.so"])
+fi
+AC_SUBST(with_pip)
+
 
 # Check for LTO support.
 AC_ARG_ENABLE(lto,

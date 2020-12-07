@@ -678,6 +678,7 @@ stage1_languages
 host_shared
 extra_linker_plugin_flags
 extra_linker_plugin_configure_flags
+with_pip
 islinc
 isllibs
 poststage1_ldflags
@@ -690,9 +691,6 @@ extra_mpc_gmp_configure_flags
 extra_mpfr_configure_flags
 gmpinc
 gmplibs
-with_pip
-pip_dynamic_linker
-pip_glibc_libdir
 do_compare
 GNATMAKE
 GNATBIND
@@ -804,8 +802,6 @@ with_gmp_dir
 with_gmp
 with_gmp_include
 with_gmp_lib
-with_glibc_libdir
-with_pip
 with_stage1_libs
 with_stage1_ldflags
 with_boot_libs
@@ -814,6 +810,8 @@ with_isl
 with_isl_include
 with_isl_lib
 enable_isl_version_check
+with_glibc_libdir
+with_pip
 enable_lto
 enable_linker_plugin_configure_flags
 enable_linker_plugin_flags
@@ -1576,10 +1574,6 @@ Optional Packages:
                           --with-gmp-lib=PATH/lib
   --with-gmp-include=PATH specify directory for installed GMP include files
   --with-gmp-lib=PATH     specify directory for the installed GMP library
-  --with-glibc-libdir[=DIR]
-                          specify glibc lib directory
-  --with-pip[=DIR]        specify prefix directory for the installed PiP
-                          package
   --with-stage1-libs=LIBS libraries for stage1
   --with-stage1-ldflags=FLAGS
                           linker flags for stage1
@@ -1592,6 +1586,10 @@ Optional Packages:
                           --with-isl-lib=PATH/lib
   --with-isl-include=PATH Specify directory for installed isl include files
   --with-isl-lib=PATH     Specify the directory for the installed isl library
+  --with-glibc-libdir[=DIR]
+                          specify glibc lib directory
+  --with-pip[=DIR]        specify prefix directory for the installed PiP
+                          package
   --with-target-bdw-gc=PATHLIST
                           specify prefix directory for installed bdw-gc
                           package. Equivalent to
@@ -5555,93 +5553,6 @@ if test "${with_gmp_lib+set}" = set; then :
 fi
 
 
-#
-# PiP
-#
-{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for glibc libdir" >&5
-$as_echo_n "checking for glibc libdir... " >&6; }
-
-# Check whether --with-glibc-libdir was given.
-if test "${with_glibc_libdir+set}" = set; then :
-  withval=$with_glibc_libdir;
-fi
-
-pip_glibc_libdir=
-pip_dynamic_linker=
-if test x"${with_glibc_libdir}" = x"no"; then
-  { $as_echo "$as_me:${as_lineno-$LINENO}: result: disabled" >&5
-$as_echo "disabled" >&6; }
-else
-  case "${with_glibc_libdir}" in
-  ""|yes) libdir_candidates="/lib64 /lib /libexec /usr/lib /usr/libexec";;
-  *) libdir_candidates="${with_glibc_libdir}";;
-  esac
-  ld_so_candidates=
-  for d in ${libdir_candidates}; do
-    if ld_so_candidates=`ls -d "${d}"/ld-[0-9]*.so 2>/dev/null`; then
-      break
-    elif ld_so_candidates=`ls -d "${d}"/ld.so.* 2>/dev/null`; then
-      break
-    elif ld_so_candidates=`ls -d "${d}"/ld-elf.so.* 2>/dev/null`; then
-      break
-    elif ld_so_candidates=`ls -d "${d}"/ld.elf_so 2>/dev/null`; then
-      break
-    fi
-  done
-  if test x"${ld_so_candidates}" != x""; then
-    ld_so=`echo "${ld_so_candidates}" | awk '{print $NF; exit}'`
-    d=`dirname "${ld_so}"`
-    if test -d "${d}" -a -x "${ld_so}"; then
-      pip_glibc_libdir="${d}"
-      pip_dynamic_linker="${ld_so}"
-      { $as_echo "$as_me:${as_lineno-$LINENO}: result: ${pip_glibc_libdir}" >&5
-$as_echo "${pip_glibc_libdir}" >&6; }
-    fi
-  fi
-  if test x"${pip_glibc_libdir}" = x""; then
-    if test x"${with_glibc_libdir}" = x""; then
-      { $as_echo "$as_me:${as_lineno-$LINENO}: result: no" >&5
-$as_echo "no" >&6; }
-    else
-      as_fn_error $? "can't find ld.so." "$LINENO" 5
-    fi
-  fi
-fi
-
-
-
-
-{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for PiP" >&5
-$as_echo_n "checking for PiP... " >&6; }
-
-# Check whether --with-pip was given.
-if test "${with_pip+set}" = set; then :
-  withval=$with_pip;
-fi
-
-case "$with_pip" in
-yes)	if   test -f /usr/local/lib/libpip.so;   then with_pip=/usr/local
-	elif test -f /usr/local/lib64/libpip.so; then with_pip=/usr/local
-	elif test -f /usr/pkg/include/pip.h;     then with_pip=/usr/pkg ##AH##  NetBSD ???
-	else with_pip=/usr
-	fi;;
-'')	with_pip=no;;	# default is "no"
-esac
-if test x"${with_pip}" = x"no"; then
-  { $as_echo "$as_me:${as_lineno-$LINENO}: result: disabled" >&5
-$as_echo "disabled" >&6; }
-elif test -f "${with_pip}/lib/libpip.so" || test -f "${with_pip}/lib64/libpip.so" ; then
-  { $as_echo "$as_me:${as_lineno-$LINENO}: result: ${with_pip}" >&5
-$as_echo "${with_pip}" >&6; }
-elif test -f "${with_pip}/lib/libpip.so" || test -f "${with_pip}/lib64/libpip.so" ; then
-  { $as_echo "$as_me:${as_lineno-$LINENO}: result: ${with_pip}" >&5
-$as_echo "${with_pip}" >&6; }
-else
-  as_fn_error $? "can't find \"${with_pip}/lib(64)/libpip.so\"" "$LINENO" 5
-fi
-
-
-
 if test "x$with_gmp" != x; then
   gmplibs="-L$with_gmp/lib $gmplibs"
   gmpinc="-I$with_gmp/include $gmpinc"
@@ -6119,6 +6030,46 @@ if test "x$with_isl" = xno ||
   islinc=
 fi
 
+
+
+
+#
+# PiP
+#
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for glibc libdir" >&5
+$as_echo_n "checking for glibc libdir... " >&6; }
+
+# Check whether --with-glibc-libdir was given.
+if test "${with_glibc_libdir+set}" = set; then :
+  withval=$with_glibc_libdir;
+fi
+
+
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for PiP" >&5
+$as_echo_n "checking for PiP... " >&6; }
+
+# Check whether --with-pip was given.
+if test "${with_pip+set}" = set; then :
+  withval=$with_pip;
+fi
+
+case "$with_pip" in
+yes)	if   test -f /usr/local/lib/libpip.so;   then with_pip=/usr/local
+	elif test -f /usr/local/lib64/libpip.so; then with_pip=/usr/local
+	elif test -f /usr/pkg/include/pip.h;     then with_pip=/usr/pkg ##AH##  NetBSD ???
+	else with_pip=/usr
+	fi;;
+'')	with_pip=no;;	# default is "no"
+esac
+if test x"${with_pip}" = x"no"; then
+  { $as_echo "$as_me:${as_lineno-$LINENO}: result: disabled" >&5
+$as_echo "disabled" >&6; }
+elif test -f "${with_pip}/lib/libpip.so" || test -f "${with_pip}/lib64/libpip.so" ; then
+  { $as_echo "$as_me:${as_lineno-$LINENO}: result: ${with_pip}" >&5
+$as_echo "${with_pip}" >&6; }
+else
+  as_fn_error $? "can't find \"${with_pip}/lib(64)/libpip.so\"" "$LINENO" 5
+fi
 
 
 
