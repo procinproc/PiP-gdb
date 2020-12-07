@@ -1675,47 +1675,6 @@ AC_MSG_CHECKING([for glibc libdir])
 AC_ARG_WITH([glibc-libdir],
   [AS_HELP_STRING([--with-glibc-libdir@<:@=DIR@:>@],
                   [specify glibc lib directory])])
-pip_glibc_libdir=
-pip_dynamic_linker=
-if test x"${with_glibc_libdir}" = x"no"; then
-  AC_MSG_RESULT([disabled])
-else
-  case "${with_glibc_libdir}" in
-  ""|yes) libdir_candidates="/lib64 /lib /libexec /usr/lib /usr/libexec";;
-  *) libdir_candidates="${with_glibc_libdir}";;
-  esac
-  ld_so_candidates=
-  for d in ${libdir_candidates}; do
-    if ld_so_candidates=`ls -d "${d}"/ld-@<:@0-9@:>@*.so 2>/dev/null`; then
-      break
-    elif ld_so_candidates=`ls -d "${d}"/ld.so.* 2>/dev/null`; then
-      break
-    elif ld_so_candidates=`ls -d "${d}"/ld-elf.so.* 2>/dev/null`; then
-      break
-    elif ld_so_candidates=`ls -d "${d}"/ld.elf_so 2>/dev/null`; then
-      break
-    fi
-  done
-  if test x"${ld_so_candidates}" != x""; then
-    ld_so=`echo "${ld_so_candidates}" | awk '{print $NF; exit}'`
-    d=`dirname "${ld_so}"`
-    if test -d "${d}" -a -x "${ld_so}"; then
-      pip_glibc_libdir="${d}"
-      pip_dynamic_linker="${ld_so}"
-      AC_MSG_RESULT([${pip_glibc_libdir}])
-    fi
-  fi
-  if test x"${pip_glibc_libdir}" = x""; then
-    if test x"${with_glibc_libdir}" = x""; then
-      AC_MSG_RESULT([no])
-    else
-      AC_MSG_ERROR([can't find ld.so.])
-    fi
-  fi
-fi
-AC_SUBST(pip_glibc_libdir)
-AC_SUBST(pip_dynamic_linker)
-
 
 AC_MSG_CHECKING([for PiP])
 AC_ARG_WITH([pip],

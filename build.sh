@@ -23,7 +23,7 @@ opt_with_expat_default="--without-expat"
 
 usage()
 {
-	echo >&2 "Usage: `basename $0` [-b|-i] --prefix=<INSTALL_DIR> --with-pip=<PIP_DIR> --with-glibc-libdir=<PIP_GLIBC_DIR>/lib"
+	echo >&2 "Usage: `basename $0` [-b|-i] --prefix=<INSTALL_DIR> --with-pip=<PIP_DIR>"
 	echo >&2 "    [default] : build and install"
 	echo >&2 "	-b      : build only, do not install"
 	echo >&2 "	-i      : install only, do not build"
@@ -38,7 +38,6 @@ do_build=true
 do_install=true
 do_clean=true
 with_pip=
-with_glibc_libdir=
 
 do_check=false
 packages=
@@ -55,8 +54,6 @@ while [ x"$1" != x ]; do
 		with_pip=$arg
 		program_prefix=--program-prefix=pip-
 		;;
-	--with-glibc-libdir=*)
-		with_glibc_libdir=$arg;;
 	--missing) do_check=true;;
 	--package=*)  packages="${packages} `expr "${arg}" : "--package=\(.*\)"`";;
 	*)      usage;;
@@ -235,7 +232,7 @@ if $do_build; then
 		--with-auto-load-safe-path='$debugdir:$datadir/auto-load:/usr/bin/mono-gdb.py' \
 		${EXTRA_CONFIGURE_OPTIONS} \
 		--prefix=${installdir} ${program_prefix} \
-	        ${with_pip} ${with_glibc_libdir} \
+	        ${with_pip} \
 		${host} \
 	    &&
 
