@@ -1,12 +1,11 @@
 #!/bin/sh
 
-cd gdb/testsuite
+cd gdb/testsuite &&
+make site.exp &&
+cat site.exp &&
+runtest TRANSCRIPT=y gdb.pip/threads.exp gdb.pip/pip.exp
+exit_code=$?
 
-make site.exp
-
-runtest gdb.pip/threads.exp gdb.pip/pip.exp
-
-exst=$?
 cat gdb.sum
 
-exit $?
+exit $exit_code
