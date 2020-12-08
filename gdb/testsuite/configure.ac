@@ -90,7 +90,7 @@ if test x"${with_pip}" = x"no"; then
   AC_MSG_RESULT([disabled])
 elif test -x "${with_pip}/bin/pipcc"; then
   AC_MSG_RESULT([${with_pip}])
-  pipcc_flags=`${with_pip}/bin/pipcc --ccopts -g`
+  pipcc_flags=`${with_pip}/bin/pipcc --ccopts`
   pip_site_exp="\\
 proc skip_pip_tests {} { return 0; }|\\
 set pipcc_flags \\\"${pipcc_flags}\\\""
