@@ -663,7 +663,8 @@ fi
 #
 # PiP
 #
-AC_MSG_CHECKING([for glibc libdir])
+
+# just ignore --with-glibc-libdir
 AC_ARG_WITH([glibc-libdir],
   [AS_HELP_STRING([--with-glibc-libdir@<:@=DIR@:>@],
                   [specify glibc lib directory])])
