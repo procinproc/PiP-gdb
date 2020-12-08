@@ -168,11 +168,11 @@ else
     echo >&2 "All required packages found"
 fi
 
-if [ x"${installdir}" == x -o x"${withpip}" == x ]; then
+if [ x"${installdir}" == x -o x"${with_pip}" == x ]; then
     usage;
 fi
 
-pipdir=`expr "${withpip}" : "--with-pip=\(.*\)"`;
+pipdir=`expr "${with_pip}" : "--with-pip=\(.*\)"`;
 if ! [ -x ${pipdir}/lib/libpip.so ]; then
     echo >&2 "${pipdir} seems not to be PiP directory"
 fi
