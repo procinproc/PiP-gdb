@@ -7647,8 +7647,8 @@ fi
 #
 # PiP
 #
-{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for glibc libdir" >&5
-$as_echo_n "checking for glibc libdir... " >&6; }
+
+# just ignore --with-glibc-libdir
 
 # Check whether --with-glibc-libdir was given.
 if test "${with_glibc_libdir+set}" = set; then :
