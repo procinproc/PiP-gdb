@@ -24,7 +24,7 @@ set srcfile     ${srcdir}/${subdir}/${executable}.c
 set srcfile2    ${srcdir}/${subdir}/${executable2}.c
 set binfile     ${objdir}/${subdir}/${executable}
 set binfile2    ${objdir}/${subdir}/${executable2}
-set flags       [list "additional_flags=${pipcc_flags}" ]
+set flags	[concat "debug" [list "additional_flags=${pipcc_flags}" ]]
 
 if { [gdb_compile ${srcfile}  ${binfile}  executable "${flags}" ] != ""} {
     untested "Could not compile ${binfile} w/ ${flags}."
