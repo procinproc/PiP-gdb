@@ -2256,7 +2256,7 @@ $as_echo "disabled" >&6; }
 elif test -x "${with_pip}/bin/pipcc"; then
   { $as_echo "$as_me:${as_lineno-$LINENO}: result: ${with_pip}" >&5
 $as_echo "${with_pip}" >&6; }
-  pipcc_flags=`${with_pip}/bin/pipcc --ccopts -g`
+  pipcc_flags=`${with_pip}/bin/pipcc --ccopts`
   pip_site_exp="\\
 proc skip_pip_tests {} { return 0; }|\\
 set pipcc_flags \\\"${pipcc_flags}\\\""
