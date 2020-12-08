@@ -637,10 +637,9 @@ CPPFLAGS
 LDFLAGS
 CFLAGS
 CC
+pipcc_flags
 pip_site_exp
 with_pip
-pip_dynamic_linker
-pip_glibc_libdir
 RPATH_ENVVAR
 subdirs
 target_noncanonical
@@ -699,7 +698,6 @@ ac_user_opts='
 enable_option_checking
 enable_gdbtk
 enable_shared
-with_glibc_libdir
 with_pip
 '
       ac_precious_vars='build_alias
@@ -1334,8 +1332,6 @@ Optional Features:
 Optional Packages:
   --with-PACKAGE[=ARG]    use PACKAGE [ARG=yes]
   --without-PACKAGE       do not use PACKAGE (same as --with-PACKAGE=no)
-  --with-glibc-libdir[=DIR]
-                          specify glibc lib directory
   --with-pip[=DIR]        specify prefix directory for the installed PiP
                           package
 
@@ -2236,59 +2232,6 @@ fi
 #
 # PiP
 #
-{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for glibc libdir" >&5
-$as_echo_n "checking for glibc libdir... " >&6; }
-
-# Check whether --with-glibc-libdir was given.
-if test "${with_glibc_libdir+set}" = set; then :
-  withval=$with_glibc_libdir;
-fi
-
-pip_glibc_libdir=
-pip_dynamic_linker=
-if test x"${with_glibc_libdir}" = x"no"; then
-  { $as_echo "$as_me:${as_lineno-$LINENO}: result: disabled" >&5
-$as_echo "disabled" >&6; }
-else
-  case "${with_glibc_libdir}" in
-  ""|yes) libdir_candidates="/lib64 /lib /libexec /usr/lib /usr/libexec";;
-  *) libdir_candidates="${with_glibc_libdir}";;
-  esac
-  ld_so_candidates=
-  for d in ${libdir_candidates}; do
-    if ld_so_candidates=`ls -d "${d}"/ld-[0-9]*.so 2>/dev/null`; then
-      break
-    elif ld_so_candidates=`ls -d "${d}"/ld.so.* 2>/dev/null`; then
-      break
-    elif ld_so_candidates=`ls -d "${d}"/ld-elf.so.* 2>/dev/null`; then
-      break
-    elif ld_so_candidates=`ls -d "${d}"/ld.elf_so 2>/dev/null`; then
-      break
-    fi
-  done
-  if test x"${ld_so_candidates}" != x""; then
-    ld_so=`echo "${ld_so_candidates}" | awk '{print $NF; exit}'`
-    d=`dirname "${ld_so}"`
-    if test -d "${d}" -a -x "${ld_so}"; then
-      pip_glibc_libdir="${d}"
-      pip_dynamic_linker="${ld_so}"
-      { $as_echo "$as_me:${as_lineno-$LINENO}: result: ${pip_glibc_libdir}" >&5
-$as_echo "${pip_glibc_libdir}" >&6; }
-    fi
-  fi
-  if test x"${pip_glibc_libdir}" = x""; then
-    if test x"${with_glibc_libdir}" = x""; then
-      { $as_echo "$as_me:${as_lineno-$LINENO}: result: no" >&5
-$as_echo "no" >&6; }
-    else
-      as_fn_error $? "can't find ld.so." "$LINENO" 5
-    fi
-  fi
-fi
-
-
-
-
 { $as_echo "$as_me:${as_lineno-$LINENO}: checking for PiP" >&5
 $as_echo_n "checking for PiP... " >&6; }
 
@@ -2298,8 +2241,9 @@ if test "${with_pip+set}" = set; then :
 fi
 
 case "$with_pip" in
-yes)	if test -f /usr/local/include/pip.h; then with_pip=/usr/local
-	elif test -f /usr/pkg/include/pip.h; then with_pip=/usr/pkg
+yes)	if   test -f /usr/local/lib/libpip.so;   then with_pip=/usr/local
+	elif test -f /usr/local/lib64/libpip.so; then with_pip=/usr/local
+	elif test -f /usr/pkg/include/pip.h;     then with_pip=/usr/pkg ##AH##  NetBSD ???
 	else with_pip=/usr
 	fi;;
 '')	with_pip=no;;	# default is "no"
@@ -2308,23 +2252,17 @@ pip_site_exp="proc skip_pip_tests {} { return 1; }"
 if test x"${with_pip}" = x"no"; then
   { $as_echo "$as_me:${as_lineno-$LINENO}: result: disabled" >&5
 $as_echo "disabled" >&6; }
-elif test -f "${with_pip}/include/pip/pip.h"; then
+elif test -x "${with_pip}/bin/pipcc"; then
   { $as_echo "$as_me:${as_lineno-$LINENO}: result: ${with_pip}" >&5
 $as_echo "${with_pip}" >&6; }
-  CPPFLAGS="$CPPFLAGS -DENABLE_PIP -I${with_pip}/include"
-  pie_cflags='-fPIE'
-  pie_ldflags='-pie -rdynamic'
+  pipcc_flags=`${with_pip}/bin/pipcc --ccopts -g`
   pip_site_exp="\\
 proc skip_pip_tests {} { return 0; }|\\
-set pie_cflags \\\"${pie_cflags}\\\"|\\
-set pie_ldflags \\\"${pie_ldflags}\\\"|\\
-set pip_cppflags \\\"-I${with_pip}/include\\\"|\\
-set pip_cflags \\\"${pie_cflags} -pthread\\\"|\\
-set pip_ldflags \\\"${pie_ldflags} -pthread -Wl,--dynamic-linker=${pip_dynamic_linker}\\\"|\\
-set pip_libs \\\"-L${with_pip}/lib -Wl,-rpath=${with_pip}/lib -lpip -ldl\\\""
+set pipcc_flags \\\"${pipcc_flags}\\\""
 else
-  as_fn_error $? "can't find \"${with_pip}/include/pip/pip.h\"" "$LINENO" 5
+  as_fn_error $? "can't find \"${with_pip}/bin/pipcc\"" "$LINENO" 5
 fi
+
 
 
 

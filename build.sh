@@ -37,6 +37,7 @@ program_prefix=
 do_build=true
 do_install=true
 do_clean=true
+with_pip=
 
 do_check=false
 packages=
@@ -48,10 +49,9 @@ while [ x"$1" != x ]; do
 	-k)	do_install=false;;
 	-i)	do_build=false;;
 	--prefix=*)   installdir=`expr "${arg}" : "--prefix=\(.*\)"`;;
-	--with-pip=*) withpip=$arg
+	--with-pip=*) with_pip=$arg
 	              program_prefix=--program-prefix=pip-
 		      ;;
-	--with-glibc-libdir=*) true;;
 	--missing) do_check=true;;
 	--package=*)  packages="${packages} `expr "${arg}" : "--package=\(.*\)"`";;
 	*)      usage;;
@@ -166,11 +166,11 @@ else
     echo >&2 "All required packages found"
 fi
 
-if [ x"${installdir}" == x -o x"${withpip}" == x ]; then
+if [ x"${installdir}" == x -o x"${with_pip}" == x ]; then
     usage;
 fi
 
-pipdir=`expr "${withpip}" : "--with-pip=\(.*\)"`;
+pipdir=`expr "${with_pip}" : "--with-pip=\(.*\)"`;
 if ! [ -x ${pipdir}/lib/libpip.so ]; then
     echo >&2 "${pipdir} seems not to be PiP directory"
 fi
@@ -230,7 +230,7 @@ if $do_build; then
 		--with-auto-load-safe-path='$debugdir:$datadir/auto-load:/usr/bin/mono-gdb.py' \
 		${EXTRA_CONFIGURE_OPTIONS} \
 		--prefix=${installdir} ${program_prefix} \
-	        ${withpip} \
+	        ${with_pip} \
 		${host} \
 	    &&
 
