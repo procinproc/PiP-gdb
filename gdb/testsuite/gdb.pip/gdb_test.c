@@ -20,7 +20,7 @@
   * Written by Atsushi HORI <ahori@riken.jp>, 2016
 */
 
-#if PIP_VERSION_MAJOR == 1
+#if !defined(PIP_VERSION_MAJOR) || PIP_VERSION_MAJOR == 1
 #include <pip.h>
 #else
 #include <pip/pip.h>
