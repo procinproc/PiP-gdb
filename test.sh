@@ -1,5 +1,10 @@
 #!/bin/sh
 
+if ! which runtest; then
+    echo >&2 "DejaGnu seems not installed and PiP-gdb test is skipped"
+    exit 0
+fi
+
 cd gdb/testsuite &&
 make site.exp &&
 cat site.exp &&
