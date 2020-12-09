@@ -42,7 +42,7 @@ set escapedbinfile2 [string_to_regexp ${binfile2}]
 
 exec sh -c "ps -axw | grep $binfile | gawk '{ if (\$5 == \"$binfile\" ) print \$1; }' | while read pid; do kill -9 \$pid; done"
 
-set env(PIP_MODE) process:pipclone
+set env(PIP_MODE) process
 set rootpid [eval exec $binfile &]
 
 # The process must be spawned.
@@ -50,14 +50,16 @@ exec sleep 5
 
 set taskpid [ exec ps -axw | grep $binfile | gawk "{ if (\$1 != $rootpid && \$5 == \"$binfile\" ) pid=\$1 } END { print pid }" ]
 set use_gdb_stub 0
-set timeout 1000
+set timeout 120
+global gdb_prompt
+set gdb_prompt "\[(\]pip-gdb\[)\]"
 
 set test "attach to PIP task"
 
 gdb_exit
 gdb_start
 
-gdb_test "set pip-auto-attach on" ""
+# gdb_test "set pip-auto-attach on" ""
 
 # Attach test.
 gdb_test "attach ${taskpid}" ".*Attaching to process $taskpid.*"
