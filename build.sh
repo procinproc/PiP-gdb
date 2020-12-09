@@ -21,9 +21,13 @@
 opt_with_rpm_default="--without-rpm"
 opt_with_expat_default="--without-expat"
 
+self=`basename $0`
+
+rm -f ${build_log}
+
 usage()
 {
-	echo >&2 "Usage: `basename $0` [-b|-i] --prefix=<INSTALL_DIR> --with-pip=<PIP_DIR>"
+	echo >&2 "Usage: $self [-b|-i] --prefix=<INSTALL_DIR> --with-pip=<PIP_DIR>"
 	echo >&2 "    [default] : build and install"
 	echo >&2 "	-b      : build only, do not install"
 	echo >&2 "	-i      : install only, do not build"
@@ -61,9 +65,26 @@ while [ x"$1" != x ]; do
     shift
 done
 
+if [ x"${installdir}" == x -o x"${with_pip}" == x ]; then
+    usage;
+fi
+
+pipdir=`expr "${with_pip}" : "--with-pip=\(.*\)"`;
+if ! [ -x ${pipdir}/lib/libpip.so ]; then
+    echo >&2 "${pipdir} seems not to be PiP directory"
+fi
+ldlinux=`${pipdir}/lib/libpip.so --ldlinux`
+case ${ldlinux} in
+    /lib/ld-*|/lib64/ld-*|/usr/lib/ld-*|/usr/lib64/ld-*)
+	echo >&2 -n "$self: Looks like the specified PiP lib (${pipdir}) is not configured ";
+	echo >&2 "to use the patched PiP-glibc and PiP-gdb cannot work without PiP-glibc";
+	exit 1;;
+    *) :;;
+esac
+
 if $do_check; then
     if [ x"${packages}" != x ]; then
-	echo >&2 "'--missing' and '--packages' cannot be specified at once"
+	echo >&2 "$self: '--missing' and '--packages' cannot be specified at once"
 	exit 1
     fi
 fi
@@ -110,7 +131,7 @@ done
 if ! [ -x ${instdir}/bin/makeinfo ]; then
     pkgfail=true
     if ! $do_check; then
-	echo >&2 "seems not to be installed"
+	echo >&2 "$self: seems not to be installed"
     else
 	echo "texinfo https://ftp.gnu.org/gnu/texinfo/texinfo-5.1.tar.gz"
     fi
@@ -166,15 +187,6 @@ elif $pkgfail ; then
     echo >&2 "WARNING: Some packages are missing and installation might be failed"
 else
     echo >&2 "All required packages found"
-fi
-
-if [ x"${installdir}" == x -o x"${with_pip}" == x ]; then
-    usage;
-fi
-
-pipdir=`expr "${with_pip}" : "--with-pip=\(.*\)"`;
-if ! [ -x ${pipdir}/lib/libpip.so ]; then
-    echo >&2 "${pipdir} seems not to be PiP directory"
 fi
 
 case `uname -m` in
