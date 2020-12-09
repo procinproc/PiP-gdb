@@ -69,9 +69,6 @@ int main( int argc, char **argv ) {
   ntasks = PIP_NTASKS_MAX;
   TESTINT( pip_init( &pipid, &ntasks, NULL, 0 ) );
 
-  pthread_create(&t1, NULL, thread1, (void *)NULL);
-  pthread_create(&t2, NULL, thread2, (void *)NULL);
-
   if( pipid == PIP_PIPID_ROOT ) {
     root_exp = 1;
     char *sleep_argv[] = {
@@ -79,6 +76,11 @@ int main( int argc, char **argv ) {
 	    NULL,
     };
 
+    DBGF( "creating pthreads" );
+    pthread_create(&t1, NULL, thread1, (void *)NULL);
+    pthread_create(&t2, NULL, thread2, (void *)NULL);
+
+    DBGF( "spawning pip tasks" );
     i = 0;
     pipid = 0;
     err = pip_spawn( sleep_argv[0], sleep_argv, NULL, i%4, &pipid, NULL, NULL, NULL );
@@ -86,6 +88,7 @@ int main( int argc, char **argv ) {
       fprintf( stderr, "pip_spawn(%d!=%d)=%d !!!!!!\n", i, pipid, err );
     }
 
+    DBGF( "waiting for pthread terminations" );
     pthread_join(t1, NULL);
     pthread_join(t2, NULL);
 
