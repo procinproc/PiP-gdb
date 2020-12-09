@@ -240,18 +240,8 @@ ptid_t (*deprecated_target_wait_hook) (ptid_t ptid,
 /* Used by UI as a wrapper around command execution.  May do various
    things like enabling/disabling buttons, etc...  */
 
-<<<<<<< HEAD
 void (*deprecated_call_command_hook) (struct cmd_list_element * c, 
 				      const char *cmd, int from_tty);
-=======
-void (*deprecated_call_command_hook) (struct cmd_list_element * c,
-				      char *cmd, int from_tty);
-
-/* Called after a `set' command has finished.  Is only run if the
-   `set' command succeeded.  */
-
-void (*deprecated_set_hook) (struct cmd_list_element * c);
->>>>>>> 0122b40... Change prompt to "(pip-gdb)" and change test env so that the prompt is acceptable
 
 /* Called when the current thread changes.  Argument is thread id.  */
 
@@ -1338,13 +1328,8 @@ There is NO WARRANTY, to the extent permitted by law.");
   if (REPORT_BUGS_TO[0])
     {
       fprintf_filtered (stream,
-<<<<<<< HEAD
 			_("For bug reporting instructions, please see:\n"));
       fprintf_filtered (stream, "%s.\n", REPORT_BUGS_TO);
-=======
-			_("\nFor bug reporting instructions, please see:\n"));
-      fprintf_filtered (stream, "%s.", REPORT_BUGS_TO);
->>>>>>> 0122b40... Change prompt to "(pip-gdb)" and change test env so that the prompt is acceptable
     }
   fprintf_filtered (stream,
 		    _("Find the GDB manual and other documentation \
@@ -1614,13 +1599,9 @@ quit_force (int *exit_arg, int from_tty)
   int exit_code = 0;
   struct qt_args qt;
 
-<<<<<<< HEAD
   undo_terminal_modifications_before_exit ();
 
   /* An optional expression may be used to cause gdb to terminate with the 
-=======
-  /* An optional expression may be used to cause gdb to terminate with the
->>>>>>> 0122b40... Change prompt to "(pip-gdb)" and change test env so that the prompt is acceptable
      value of that expression.  */
   if (exit_arg)
     exit_code = *exit_arg;
