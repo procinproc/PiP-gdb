@@ -43,12 +43,16 @@ set rootpid [eval exec $binfile &]
 exec sleep 5
 
 set use_gdb_stub 0
-set timeout 1000
+set timeout 120
+global gdb_prompt
+set gdb_prompt "\[(\]pip-gdb\[)\]"
 
 set test "attach to PIP task"
 
 gdb_exit
 gdb_start
+
+# gdb_test "set pip-auto-attach on" ""
 
 # Attach test.
 gdb_test "attach ${rootpid}" ".*Attaching to process $rootpid.*"
