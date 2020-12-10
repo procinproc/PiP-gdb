@@ -65,24 +65,23 @@ while [ x"$1" != x ]; do
     shift
 done
 
-if [ x"${installdir}" == x -o x"${with_pip}" == x ]; then
-    usage;
-fi
-
-pipdir=`expr "${with_pip}" : "--with-pip=\(.*\)"`;
-if ! [ -x ${pipdir}/lib/libpip.so ]; then
-    echo >&2 "${pipdir} seems not to be PiP directory"
-fi
-ldlinux=`${pipdir}/lib/libpip.so --ldlinux`
-case ${ldlinux} in
-    /lib/ld-*|/lib64/ld-*|/usr/lib/ld-*|/usr/lib64/ld-*)
-	echo >&2 -n "$self: Looks like the specified PiP lib (${pipdir}) is not configured ";
-	echo >&2 "to use the patched PiP-glibc and PiP-gdb cannot work without PiP-glibc";
-	exit 1;;
-    *) :;;
-esac
-
-if $do_check; then
+if ! ${do_check}; then
+    if [ x"${installdir}" == x -o x"${with_pip}" == x ]; then
+	usage;
+    fi
+    pipdir=`expr "${with_pip}" : "--with-pip=\(.*\)"`;
+    if ! [ -x ${pipdir}/lib/libpip.so ]; then
+	echo >&2 "${pipdir} seems not to be PiP directory"
+    fi
+    ldlinux=`${pipdir}/lib/libpip.so --ldlinux`
+    case ${ldlinux} in
+	/lib/ld-*|/lib64/ld-*|/usr/lib/ld-*|/usr/lib64/ld-*)
+	    echo >&2 -n "$self: Looks like the specified PiP lib (${pipdir}) is not configured ";
+	    echo >&2 "to use the patched PiP-glibc and PiP-gdb cannot work without PiP-glibc";
+	    exit 1;;
+	*) :;;
+    esac
+else
     if [ x"${packages}" != x ]; then
 	echo >&2 "$self: '--missing' and '--packages' cannot be specified at once"
 	exit 1
