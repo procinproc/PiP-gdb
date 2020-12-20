@@ -23,10 +23,6 @@ BEGIN {
 	result = $1
 	test = $0
 	sub(/^[^:]*: /, "", test)
-
-	if (result = "UNTEST:" && test ~ /Could not compile/)
-		result = "FAIL:"
-
 	printf "  <testcase classname=\"%s\" name=\"%s\">\n", test_class, test
 	if (result ~ /^(FAIL|XPASS|XFAIL|KFAIL):$/) {
 		printf "    <failure type=\"%s\"/>\n",
