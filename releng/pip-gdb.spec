@@ -71,7 +71,8 @@ Recommends: dnf-command(debuginfo-install)
 Conflicts: gdb-headless < 7.12-29
 
 Summary: A stub package for GNU source-level debugger
-Requires: gdb-headless%{?_isa} = %{version}-%{release}
+#Requires: gdb-headless%{?_isa} = %{version}-%{release}
+Requires: gdb-headless%{?_isa}
 
 %description
 'gdb' package is only a stub to install gcc-gdb-plugin for 'compile' commands.
