@@ -35,6 +35,7 @@ if { [gdb_compile ${srcfile2} ${binfile2} executable "${flags}"] != "" } {
     untested "Could not compile ${binfile2} w/ ${flags}."
     return -1
 }
+exec ${pip_unpie} ${binfile2}
 
 set env(PIP_MODE) pthread
 set rootpid [eval exec $binfile &]
