@@ -92,10 +92,6 @@ if $do_check; then
     fi
 fi
 
-if [ x"${build_parallelism}" != x ]; then
-    BUILD_PARALLELISM=${build_parallelism}
-fi
-
 curdir=`dirname $0`
 cppflags=
 cflags=
@@ -216,6 +212,10 @@ esac
 : ${BUILD_PARALLELISM=`getconf _NPROCESSORS_ONLN`}
 : ${EXTRA_CONFIGURE_OPTIONS="${opt_werror} ${opt_with_rpm} ${opt_inprocess_agent} --enable-targets=s390-linux-gnu,powerpc-linux-gnu,powerpcle-linux-gnu"}
 : ${EXTRA_GCC_OPTIONS="-fstack-protector-strong -grecord-gcc-switches"}
+
+if [ x"${build_parallelism}" != x ]; then
+    BUILD_PARALLELISM=${build_parallelism}
+fi
 
 if [ x"${cppflags}" != x ]; then
     cppflags="-Wp,${cppflags}"
