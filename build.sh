@@ -27,10 +27,11 @@ rm -f ${build_log}
 
 usage()
 {
-	echo >&2 "Usage: $self [-b|-i] --prefix=<INSTALL_DIR> --with-pip=<PIP_DIR>"
+	echo >&2 "Usage: $self [-b|-i] [-j<N>] --prefix=<INSTALL_DIR> --with-pip=<PIP_DIR>"
 	echo >&2 "    [default] : build and install"
 	echo >&2 "	-b      : build only, do not install"
 	echo >&2 "	-i      : install only, do not build"
+	echo >&2 "	-j<N>   : make parallelism"
 	exit 2
 }
 
@@ -45,6 +46,7 @@ with_pip=
 
 do_check=false
 packages=
+build_parallelism=
 
 while [ x"$1" != x ]; do
     arg=$1
@@ -52,6 +54,7 @@ while [ x"$1" != x ]; do
 	-b)	do_install=false; do_clean=false;;
 	-k)	do_install=false;;
 	-i)	do_build=false;;
+	-j*)	build_parallelism=`expr "$1" : "-j\([0-9]*\)"`;;
 	--prefix=*)
 		installdir=`expr "${arg}" : "--prefix=\(.*\)"`;;
 	--with-pip=*)
@@ -87,6 +90,10 @@ if $do_check; then
 	echo >&2 "$self: '--missing' and '--packages' cannot be specified at once"
 	exit 1
     fi
+fi
+
+if [ x"${build_parallelism}" != x ]; then
+    BUILD_PARALLELISM=${build_parallelism}
 fi
 
 curdir=`dirname $0`
@@ -220,10 +227,9 @@ fi
 set -x
 
 if $do_build; then
-
 	if $do_clean; then
-		make clean || true
-		make distclean || true
+		make clean
+		make distclean
 		find . -name config.cache -delete
 	fi
 
@@ -248,7 +254,7 @@ if $do_build; then
 		${host} \
 	    &&
 
-	make -j ${BUILD_PARALLELISM} \
+	make -j${BUILD_PARALLELISM} \
 	        "CFLAGS=-O2 -g -pipe -Wall \
 		 ${cppflags} ${ccflags} ${ldflags} \
 		 -fexceptions \
@@ -263,7 +269,7 @@ if $do_build; then
 		gdb/config.status \
 	    &&
 
-	make -j ${BUILD_PARALLELISM} \
+	make -j${BUILD_PARALLELISM} \
 	        "CFLAGS=-O2 -g -pipe -Wall \
 		 ${cppflags} ${ccflags} ${ldflags} \
 		 -Wp,-D_FORTIFY_SOURCE=2 \
