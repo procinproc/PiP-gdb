@@ -59,11 +59,11 @@ gdb_start
 gdb_test "attach ${rootpid}" ".*Attaching to process $rootpid.*"
 
 # info threads test.
-gdb_test "info threads" ".*  2 .* Thread .*"
+gdb_test "info threads" ".*  1\.2 .* Thread .*"
 
-gdb_test "thread 2" ".*Switching to thread 2.*"
+gdb_test "thread 2" ".*Switching to thread 1\.2.*"
 
-gdb_test "info threads" ".*\\* 2 .* Thread .*"
+gdb_test "info threads" ".*\\* 1\.2 .* Thread .*"
 
 # Detach test.
 gdb_test "detach" "process $rootpid.*"
