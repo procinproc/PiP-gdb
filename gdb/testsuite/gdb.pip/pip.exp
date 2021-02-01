@@ -68,9 +68,11 @@ gdb_test "attach ${taskpid}" ".*Attaching to process $taskpid.*"
 # print test.
 gdb_test "print test" "= 20"
 
+# frame test.
+gdb_test "frame 2" " in main \\(\\) at .*"
+
 # list test.
-# It matches to syscall-template.S
-gdb_test "list" "#endif.*"
+gdb_test "list" "sleep\\(30\\);.*"
 
 # backtrace test.
 gdb_test "backtrace" "main ().*"
