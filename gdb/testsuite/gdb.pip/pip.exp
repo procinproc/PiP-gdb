@@ -72,12 +72,6 @@ gdb_test "attach ${taskpid}" ".*Attaching to process $taskpid.*"
 # print test.
 gdb_test "print test" "= 20"
 
-# frame test.
-gdb_test "frame 2" " in main \\(\\) at .*"
-
-# list test.
-gdb_test "list" "sleep\\(30\\);.*"
-
 # backtrace test.
 gdb_test "backtrace" "main ().*"
 
@@ -100,6 +94,9 @@ gdb_test "break foo" "Breakpoint 2 at 0x\[0-9a-f]*: file ${escapedsrcfile2},.*" 
 
 # continue test.
 gdb_test "continue" "Continuing.*"
+
+# list test.
+gdb_test "list" "printf\\(\"Bar\\.\\.\\.\\\\n\"\\);.*"
 
 # next test.
 gdb_test "next" "printf\\(\"Bar.*" "next1"
