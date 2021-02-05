@@ -1296,6 +1296,30 @@ esac
 # Used for setting $lt_cv_objdir
 _LT_CHECK_OBJDIR
 
+#
+# PiP
+#
+AC_MSG_CHECKING([for PiP])
+AC_ARG_WITH([pip],
+  [AS_HELP_STRING([--with-pip@<:@=PATH@:>@],
+	          [specify prefix directory for the installed PiP package])])
+case "$with_pip" in
+yes)	if   test -f /usr/local/lib/libpip.so;   then with_pip=/usr/local
+	elif test -f /usr/local/lib64/libpip.so; then with_pip=/usr/local
+	elif test -f /usr/pkg/include/pip.h;     then with_pip=/usr/pkg ##AH##  NetBSD ???
+	else with_pip=/usr
+	fi;;
+'')	with_pip=no;;	# default is "no"
+esac
+if test x"${with_pip}" = x"no"; then
+  AC_MSG_RESULT([disabled])
+elif test -f "${with_pip}/lib/libpip.so" || test -f "${with_pip}/lib64/libpip.so" ; then
+  AC_MSG_RESULT([${with_pip}])
+else
+  AC_MSG_ERROR([can't find "${with_pip}/lib(64)/libpip.so"])
+fi
+AC_SUBST(with_pip)
+
 # Check for GMP, MPFR and MPC
 gmplibs="-lmpc -lmpfr -lgmp"
 gmpinc=
@@ -1667,37 +1691,6 @@ fi
 AC_SUBST(islinc)
 AC_SUBST(clooglibs)
 AC_SUBST(clooginc)
-
-#
-# PiP
-#
-
-# just ignore --with-glibc-libdir
-AC_ARG_WITH([glibc-libdir],
-  [AS_HELP_STRING([--with-glibc-libdir@<:@=DIR@:>@],
-                  [specify glibc lib directory])])
-
-AC_MSG_CHECKING([for PiP])
-AC_ARG_WITH([pip],
-  [AS_HELP_STRING([--with-pip@<:@=DIR@:>@],
-	          [specify prefix directory for the installed PiP package])])
-case "$with_pip" in
-yes)	if   test -f /usr/local/lib/libpip.so;   then with_pip=/usr/local
-	elif test -f /usr/local/lib64/libpip.so; then with_pip=/usr/local
-	elif test -f /usr/pkg/include/pip.h;     then with_pip=/usr/pkg ##AH##  NetBSD ???
-	else with_pip=/usr
-	fi;;
-'')	with_pip=no;;	# default is "no"
-esac
-if test x"${with_pip}" = x"no"; then
-  AC_MSG_RESULT([disabled])
-elif test -f "${with_pip}/lib/libpip.so" || test -f "${with_pip}/lib64/libpip.so" ; then
-  AC_MSG_RESULT([${with_pip}])
-else
-  AC_MSG_ERROR([can't find "${with_pip}/lib(64)/libpip.so"])
-fi
-AC_SUBST(with_pip)
-
 
 # Check for LTO support.
 AC_ARG_ENABLE(lto,

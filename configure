@@ -643,7 +643,6 @@ DEBUG_PREFIX_CFLAGS_FOR_TARGET
 SYSROOT_CFLAGS_FOR_TARGET
 stage1_languages
 extra_host_libiberty_configure_flags
-with_pip
 clooginc
 clooglibs
 islinc
@@ -657,6 +656,7 @@ extra_mpc_gmp_configure_flags
 extra_mpfr_configure_flags
 gmpinc
 gmplibs
+with_pip
 do_compare
 GNATMAKE
 GNATBIND
@@ -753,6 +753,7 @@ enable_libssp
 enable_libstdcxx
 enable_static_libjava
 enable_bootstrap
+with_pip
 with_mpc
 with_mpc_include
 with_mpc_lib
@@ -777,8 +778,6 @@ enable_isl_version_check
 with_cloog_include
 with_cloog_lib
 enable_cloog_version_check
-with_glibc_libdir
-with_pip
 enable_lto
 enable_stage1_languages
 enable_objc_gc
@@ -1498,6 +1497,8 @@ Optional Packages:
   --with-PACKAGE[=ARG]    use PACKAGE [ARG=yes]
   --without-PACKAGE       do not use PACKAGE (same as --with-PACKAGE=no)
   --with-build-libsubdir=DIR  Directory where to find libraries for build system
+  --with-pip[=PATH]       specify prefix directory for the installed PiP
+                          package
   --with-mpc=PATH         specify prefix directory for installed MPC package.
                           Equivalent to --with-mpc-include=PATH/include plus
                           --with-mpc-lib=PATH/lib
@@ -1539,10 +1540,6 @@ Optional Packages:
                           Specify directory for installed CLooG include files
   --with-cloog-lib=PATH   Specify the directory for the installed CLooG
                           library
-  --with-glibc-libdir[=DIR]
-                          specify glibc lib directory
-  --with-pip[=DIR]        specify prefix directory for the installed PiP
-                          package
   --with-build-sysroot=SYSROOT
                           use sysroot as the system root during the build
   --with-debug-prefix-map='A=B C=D ...'
@@ -5303,6 +5300,36 @@ _ACEOF
 
 
 
+#
+# PiP
+#
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for PiP" >&5
+$as_echo_n "checking for PiP... " >&6; }
+
+# Check whether --with-pip was given.
+if test "${with_pip+set}" = set; then :
+  withval=$with_pip;
+fi
+
+case "$with_pip" in
+yes)	if   test -f /usr/local/lib/libpip.so;   then with_pip=/usr/local
+	elif test -f /usr/local/lib64/libpip.so; then with_pip=/usr/local
+	elif test -f /usr/pkg/include/pip.h;     then with_pip=/usr/pkg ##AH##  NetBSD ???
+	else with_pip=/usr
+	fi;;
+'')	with_pip=no;;	# default is "no"
+esac
+if test x"${with_pip}" = x"no"; then
+  { $as_echo "$as_me:${as_lineno-$LINENO}: result: disabled" >&5
+$as_echo "disabled" >&6; }
+elif test -f "${with_pip}/lib/libpip.so" || test -f "${with_pip}/lib64/libpip.so" ; then
+  { $as_echo "$as_me:${as_lineno-$LINENO}: result: ${with_pip}" >&5
+$as_echo "${with_pip}" >&6; }
+else
+  as_fn_error "can't find \"${with_pip}/lib(64)/libpip.so\"" "$LINENO" 5
+fi
+
+
 # Check for GMP, MPFR and MPC
 gmplibs="-lmpc -lmpfr -lgmp"
 gmpinc=
@@ -6163,46 +6190,6 @@ if test "x$with_isl" = xno ||
 fi
 
 
-
-
-
-#
-# PiP
-#
-
-# just ignore --with-glibc-libdir
-
-# Check whether --with-glibc-libdir was given.
-if test "${with_glibc_libdir+set}" = set; then :
-  withval=$with_glibc_libdir;
-fi
-
-
-{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for PiP" >&5
-$as_echo_n "checking for PiP... " >&6; }
-
-# Check whether --with-pip was given.
-if test "${with_pip+set}" = set; then :
-  withval=$with_pip;
-fi
-
-case "$with_pip" in
-yes)	if   test -f /usr/local/lib/libpip.so;   then with_pip=/usr/local
-	elif test -f /usr/local/lib64/libpip.so; then with_pip=/usr/local
-	elif test -f /usr/pkg/include/pip.h;     then with_pip=/usr/pkg ##AH##  NetBSD ???
-	else with_pip=/usr
-	fi;;
-'')	with_pip=no;;	# default is "no"
-esac
-if test x"${with_pip}" = x"no"; then
-  { $as_echo "$as_me:${as_lineno-$LINENO}: result: disabled" >&5
-$as_echo "disabled" >&6; }
-elif test -f "${with_pip}/lib/libpip.so" || test -f "${with_pip}/lib64/libpip.so" ; then
-  { $as_echo "$as_me:${as_lineno-$LINENO}: result: ${with_pip}" >&5
-$as_echo "${with_pip}" >&6; }
-else
-  as_fn_error "can't find \"${with_pip}/lib(64)/libpip.so\"" "$LINENO" 5
-fi
 
 
 
