@@ -23,6 +23,8 @@ opt_with_expat_default="--without-expat"
 
 self=`basename $0`
 
+echo $0 $@ > .build.cmd
+
 rm -f ${build_log}
 
 usage()
