@@ -116,6 +116,6 @@ gdb_test "inferior 2" "Switching to inferior 2 \\\[process \[0-9\]* \\(pip root\
 
 # The process must be exit.
 exec sleep 10
-exec ${pips} -k -f $rootpid
+exec -ignorestderr ${pips} -k -f $rootpid
 
 return 0
