@@ -26,7 +26,7 @@ set binfile     ${objdir}/${subdir}/${executable}
 set binfile2    ${objdir}/${subdir}/${executable2}
 set flags	[concat "debug" [list "additional_flags=${pipcc_flags}" ]]
 
-if { [gdb_compile ${srcfile}  ${binfile}  executable "${flags}" ] != ""} {
+if { [gdb_compile ${srcfile}  ${binfile} executable "${flags}" ] != ""} {
     untested "Could not compile ${binfile} w/ ${flags}."
     return -1
 }
@@ -73,6 +73,6 @@ gdb_test "detach" "process $rootpid.*"
 
 # The process must be exit.
 exec sleep 10
-exec -ignorestderr -- ${pips} -k -f $rootpid
+catch { exec -ignorestderr -- ${pips} -k -f $rootpid }
 
 return 0

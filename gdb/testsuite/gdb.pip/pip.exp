@@ -26,12 +26,12 @@ set binfile     ${objdir}/${subdir}/${executable}
 set binfile2    ${objdir}/${subdir}/${executable2}
 set flags	[concat "debug" [list "additional_flags=${pipcc_flags}" ]]
 
-if { [gdb_compile ${srcfile}  ${binfile} executable ${flags} ] != ""} {
+if { [gdb_compile ${srcfile}  ${binfile} executable "${flags}" ] != ""} {
     untested "Could not compile ${binfile} w/ ${flags}."
     return -1
 }
 
-if { [gdb_compile ${srcfile2} ${binfile2} executable "${flags}" ] != "" } {
+if { [gdb_compile ${srcfile2} ${binfile2} executable "${flags}"] != "" } {
     untested "Could not compile ${binfile2} w/ ${flags}."
     return -1
 }
@@ -45,7 +45,7 @@ set escapedsrcfile2 [string_to_regexp ${srcfile2}]
 set escapedbinfile  [string_to_regexp ${binfile}]
 set escapedbinfile2 [string_to_regexp ${binfile2}]
 
-exec sh -c "ps -axw | grep $binfile | gawk '{ if (\$5 == \"$binfile\" ) print \$1; }' | while read pid; do kill -9 \$pid; done"
+#exec sh -c "ps -axw | grep $binfile | gawk '{ if (\$5 == \"$binfile\" ) print \$1; }' | while read pid; do kill -9 \$pid; done"
 
 set env(PIP_MODE) process
 set rootpid [eval exec $binfile &]
@@ -53,7 +53,9 @@ set rootpid [eval exec $binfile &]
 # The process must be spawned.
 exec sleep 5
 
-set taskpid [ exec ps -axw | grep $binfile | gawk "{ if (\$1 != $rootpid && \$5 == \"$binfile\" ) pid=\$1 } END { print pid }" ]
+#set taskpid [ exec ps -axw | grep $binfile | gawk "{ if (\$1 != $rootpid && \$5 == \"$binfile\" ) pid=\$1 } END { print pid }" ]
+set taskpid [ exec ${pips} --family --task $rootpid | gawk "{ pid=\$1 } END { print pid }" ]
+
 set use_gdb_stub 0
 set timeout 120
 global gdb_prompt
@@ -113,9 +115,9 @@ gdb_test "detach" "process $taskpid.*"
 # switching inferior 2 - take 2
 gdb_test "inferior 2" "Switching to inferior 2 \\\[process \[0-9\]* \\(pip root\\)\\\] \\(${escapedbinfile}\\)\\\].*" "inferior 2 - 2"
 
-
-# The process must be exit.
+# The process must be terminated
 exec sleep 10
-exec -ignorestderr -- ${pips} -k -f $rootpid
+catch { exec -ignorestderr -- ${pips} -k -f $rootpid }
 
 return 0
+
