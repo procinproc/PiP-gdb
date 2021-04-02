@@ -1,0 +1,151 @@
+name: pip-gdb RPM
+
+on:
+  repository_dispatch:
+    types: [pip-gdb-test-ok, pip-gdb-rpm-invoke]
+  # client-payload:
+  #    github.event.client_payload.distros: ["centos7", "centos8"]
+  #    github.event.client_payload.archs: ["amd64", "arm64"]
+  #    github.event.client_payload.pip_versions: ["2", "3"]
+
+jobs:
+
+  source:
+
+    strategy:
+      fail-fast: false
+      matrix:
+        distro: ${{ github.event.client_payload.distros }}
+        pip_version: ${{ github.event.client_payload.pip_versions }}
+
+    runs-on: ubuntu-latest
+
+    steps:
+
+      - name: determine PiP-gdb ref
+        id: gdb_ref
+        run: |
+          set -x
+          case "${{ matrix.distro }}" in
+          centos7) gdb_ref=centos/gdb-7.6.1-94.el7.pip.branch;;
+          centos8) gdb_ref=centos/gdb-8.2-12.el8.pip.branch;;
+          *) echo >&2 "${{ matrix.distro }}: unknown distro"; exit 1;;
+          esac
+          echo "::set-output name=gdb_ref::${gdb_ref}"
+
+      - name: checkout
+        uses: actions/checkout@v2
+        with:
+          ref: ${{ steps.gdb_ref.outputs.gdb_ref }}
+
+      - name: create SRPM
+        run: |
+          set -x
+          distro=${{ matrix.distro }}
+          case $distro in
+          centos7) dist=el7;;
+          centos8) dist=el8;;
+          *) echo >&2 "${distro}: unknown distro"; exit 1;;
+          esac
+          pip_gdb_release=`awk '$1 == "%define" && $2 == "pip_gdb_release" {print $3}' releng/pip-gdb.spec`
+          gdb_version=`awk '$1 == "Version:"{print $2}' releng/pip-gdb.spec`
+          rpm_release=`awk '$1 == "Release:"{print $2}' releng/pip-gdb.spec | sed 's/%.*//'`
+          base_name=gdb-${gdb_version}-${rpm_release}.${dist}
+          base_branch=centos/${base_name}.branch
+          pip_branch=${{ steps.gdb_ref.outputs.gdb_ref }}
+          patch=gdb-${dist}-${pip_gdb_release}.patch
+          case $distro in
+          centos7) base_srpm=http://ftp.pbone.net/mirror/vault.centos.org/7.3.1611/os/Source/SPackages/${base_name}.src.rpm;;
+          centos8) base_srpm=http://ftp.pbone.net/mirror/vault.centos.org/8.3.2011/AppStream/Source/SPackages/${base_name}.src.rpm;;
+          esac
+          git fetch origin ${base_branch}
+          git diff origin/${base_branch} ${pip_branch} >/tmp/${patch}
+          cd releng
+          mv /tmp/${patch} ./
+          docker run -v $(pwd):/host -e "RPM_BASE_SRPM=${base_srpm}" -e "RPM_PATCH=/host/${patch}" -e 'RPM_SPEC=/host/pip-gdb.spec' -e 'RPM_RESULTS=/host/srpm' ${{ secrets.DOCKERHUB_USER }}/pip-prep:${distro} /host/docker/pip-gdb-rpm/source.sh
+
+      - name: Display generated SRPMs
+        run: ls -lR releng/srpm
+
+      - name: upload SRPM
+        uses: actions/upload-artifact@v2
+        with:
+          name: pip-${{ matrix.pip_version }}-gdb-${{ matrix.distro }}-srpm
+          path: |
+            releng/srpm
+            releng/docker/pip-gdb-rpm
+
+  build:
+
+    needs: [source]
+
+    strategy:
+      fail-fast: false
+      matrix:
+        distro: ${{ github.event.client_payload.distros }}
+        arch: ${{ github.event.client_payload.archs }}
+        pip_version: ${{ github.event.client_payload.pip_versions }}
+
+    runs-on: ubuntu-latest
+
+    steps:
+
+      - name: download SRPM and pip-gdb-rpm scripts
+        uses: actions/download-artifact@v2
+        with:
+          name: pip-${{ matrix.pip_version }}-gdb-${{ matrix.distro }}-srpm
+
+      - name: Display structure of downloaded files
+        run: ls -lR
+
+      - name: Setup QEMU user-mode emulation
+        uses: docker/setup-qemu-action@v1
+
+      - name: create RPM
+        run: |
+          set -x
+          docker run -v $(pwd):/host -e "RPM_SRPM=/host/srpm/*" -e 'RPM_SPEC=pip-gdb.spec' -e 'RPM_RESULTS=/host/rpm' ${{ secrets.DOCKERHUB_USER }}/pip-glibc-libpip:${{ matrix.pip_version }}.HEAD-${{ matrix.distro }}-${{ matrix.arch }} /bin/sh -x /host/docker/pip-gdb-rpm/build.sh
+
+      - name: Display generated RPMs
+        run: ls -lR rpm
+
+      - name: upload RPM
+        uses: actions/upload-artifact@v2
+        with:
+          name: pip-${{ matrix.pip_version }}-gdb-${{ matrix.distro }}-${{ matrix.arch }}-rpm
+          path: rpm
+
+  dispatch:
+
+    needs: [build]
+
+    strategy:
+      matrix:
+        repo: ['${{ github.repository }}' ]
+
+    runs-on: ubuntu-latest
+
+    steps:
+
+      - name: determine archtypes
+        id: archtypes
+        run: |
+          set -x
+          if ${{ contains(github.event.client_payload.archs, 'amd64') }} &&
+             ${{ contains(github.event.client_payload.archs, 'arm64') }}
+          then
+            archtypes='["multiarch", "amd64", "arm64"]'
+          else
+            archtypes="[$(echo "${{ toJSON(github.event.client_payload.archs) }}" | sed -e 1d -e '$d' | awk 'NR>1 {print ","} {printf "\"%s\"", $1}' )]"
+          fi
+          echo "archs=<${{ github.event.client_payload.archs }}>"
+          echo "toJSON(archs)=<${{ toJSON(github.event.client_payload.archs) }}>"
+          echo "::set-output name=archtypes::${archtypes}"
+
+      - name: dispatch event
+        uses: peter-evans/repository-dispatch@v1
+        with:
+          token: ${{ secrets.PIP_BUILD_TOKEN }}
+          repository: ${{ matrix.repo }}
+          event-type: pip-gdb-rpm-built
+          client-payload: '{ "distros": ${{ toJSON(github.event.client_payload.distros) }}, "archtypes": ${{ steps.archtypes.outputs.archtypes }}, "pip_versions": ${{ toJSON(github.event.client_payload.pip_versions) }} }'
