@@ -1,0 +1,48 @@
+name: run PiP-gdb test
+
+on:
+
+  workflow_dispatch:
+
+    inputs:
+
+      distros:
+        description: 'distribtions to test (optional)'
+        required: false
+        default: '[ "centos7", "centos8" ]'
+
+      archs:
+        description: 'architectures to test'
+        required: true
+        default: '[ "amd64", "arm64" ]'
+
+      pip_versions:
+        description: 'pip_versions to test'
+        required: true
+        default: '[ "2", "3" ]'
+
+      gdb_ref:
+        description: 'PiP-gdb commit to test (optional)'
+        required: false
+        default: ''
+
+      dispatch:
+        description: 'whether to invoke RPM build or not'
+        required: true
+        default: 'false'
+
+jobs:
+
+  dispatch:
+
+    runs-on: ubuntu-latest
+
+    steps:
+
+      - name: dispatch event
+        uses: peter-evans/repository-dispatch@v1
+        with:
+          token: ${{ secrets.PIP_BUILD_TOKEN }}
+          repository: ${{ github.repository }}
+          event-type: pip-gdb-test-invoke
+          client-payload: '{ "distros": ${{ github.event.inputs.distros }}, "archs": ${{ github.event.inputs.archs }}, "pip_versions": ${{ github.event.inputs.pip_versions }}, "gdb_ref": "${{ github.event.inputs.gdb_ref }}", "dispatch": "${{ github.event.inputs.dispatch }}" }'
