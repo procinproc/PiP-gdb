@@ -1,0 +1,123 @@
+name: PiP-gdb test
+
+on:
+
+  repository_dispatch:
+    types: [pip-built, pip-gdb-update, pip-gdb-test-invoke ]
+  # client-payload:
+  #    github.event.client_payload.distros:
+  #		["centos7", "centos8"] if gdb_ref == ''
+  #		or
+  #		[""] if gdb_ref != ''
+  #    github.event.client_payload.archs: ["amd64", "arm64"]
+  #    github.event.client_payload.pip_versions: ["2", "3"]
+  #    github.event.client_payload.gdb_ref: commit_hash or ''
+  #    github.event.client_payload.dispatch: true or false
+  #
+  # - pip-built
+  #    github.event.client_payload.distros: ["centos7", "centos8"]
+  #    github.event.client_payload.archs: ["amd64", "arm64"]
+  #    github.event.client_payload.pip_versions: ["2", "3"]
+  #    github.event.client_payload.gdb_ref: ''
+  #    github.event.client_payload.dispatch: true
+  # - pip-gdb-test-invoke
+  #    anything
+  # - pip-gdb-update
+  #    github.event.client_payload.distros:
+  #		["centos7", "centos8"] if gdb_ref == ''
+  #		or
+  #		[""] if gdb_ref != ''
+  #    github.event.client_payload.archs: ["amd64", "arm64"]
+  #    github.event.client_payload.pip_versions:
+  #		["2"] or ["3"] if it's git push to pip-2 or pip-3 branch
+  #		or
+  #		[""] if anything else
+  #    github.event.client_payload.pip_ref:
+  #		'' if  it's git push to pip-2 or pip-3 branch
+  #		or
+  #		commit_hash
+  #    github.event.client_payload.pip_testsuite_ref: ''
+  #    github.event.client_payload.dispatch: true if not pull_request
+  # - pip-testsuite-update
+  #    github.event.client_payload.distros: ["centos7", "centos8"]
+  #    github.event.client_payload.archs: ["amd64", "arm64"]
+  #    github.event.client_payload.pip_versions: ["2", "3"]
+  #    github.event.client_payload.pip_ref: ''
+  #    github.event.client_payload.pip_testsuite_ref: commit_hash
+  #    github.event.client_payload.dispatch: false
+
+jobs:
+
+  build:
+
+    strategy:
+      fail-fast: false
+      matrix:
+        distro: ${{ github.event.client_payload.distros }}
+        arch: ${{ github.event.client_payload.archs }}
+        pip_version: ${{ github.event.client_payload.pip_versions }}
+
+    runs-on: ubuntu-latest
+
+    steps:
+
+      - name: determine PiP-gdb ref
+        id: gdb_ref
+        run: |
+          set -x
+          gdb_ref="${{ github.event.client_payload.gdb_ref }}"
+          case ${gdb_ref} in
+          '')
+            case "${{ matrix.distro }}" in
+            centos7) gdb_ref=centos/gdb-7.6.1-94.el7.pip.branch;;
+            centos8) gdb_ref=centos/gdb-8.2-12.el8.pip.branch;;
+            *) echo >&2 "${{ matrix.distro }}: unknown distro"; exit 1;;
+            esac;;
+          esac
+          echo "::set-output name=gdb_ref::${gdb_ref}"
+
+      - name: checkout PiP-gdb
+        if: github.event.client_payload.gdb_ref == ''
+        uses: actions/checkout@v2
+        with:
+          ref: ${{ steps.gdb_ref.outputs.gdb_ref }}
+
+      - name: Setup QEMU user-mode emulation
+        uses: docker/setup-qemu-action@v1
+
+      - name: test
+        run: |
+          set -x
+          docker run -v $(pwd):/host --cap-add=SYS_PTRACE --security-opt=seccomp=unconfined -e "PIP_VERSION=${{ matrix.pip_version }}" ${{ secrets.DOCKERHUB_USER }}/pip-glibc-libpip:${{ matrix.pip_version }}.HEAD-${{ matrix.distro }}-${{ matrix.arch }} /bin/sh -x /host/.github/workflows/test.sh
+
+      - name: upload test results
+        if: always()
+        uses: actions/upload-artifact@v2
+        with:
+          name: pip-${{ matrix.pip_version  }}-gdb-test-${{ matrix.distro }}-${{ matrix.arch }}
+          path: |
+            gdb/testsuite/*.log
+            gdb/testsuite/*.sum
+            gdb/testsuite/*.xml
+            gdb/testsuite/site.exp
+
+  dispatch:
+    if: github.event.client_payload.dispatch && github.event.client_payload.gdb_ref == ''
+
+    needs: [build]
+
+    strategy:
+      matrix:
+        repo: ['${{ github.repository }}']
+
+    runs-on: ubuntu-latest
+
+    steps:
+
+      - name: dispatch event
+        uses: peter-evans/repository-dispatch@v1
+        with:
+          token: ${{ secrets.PIP_BUILD_TOKEN }}
+          repository: ${{ matrix.repo }}
+          event-type: pip-gdb-test-ok
+          client-payload: '{ "distros": ${{ toJSON(github.event.client_payload.distros) }}, "archs": ${{ toJSON(github.event.client_payload.archs) }}, "pip_versions": ${{ toJSON(github.event.client_payload.pip_versions) }} }'

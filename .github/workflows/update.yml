@@ -1,0 +1,47 @@
+name: PiP-gdb update handler
+
+on: [push, pull_request]
+
+jobs:
+
+  dispatch:
+
+    runs-on: ubuntu-latest
+
+    steps:
+
+      - name: determine distros
+        id: distros
+        run: |
+          set -x
+          echo "event_name=<${{ github.event_name }}>"
+          dist=
+          case "${{ github.ref }}" in
+          refs/heads/centos/gdb-*.el*.pip.branch)
+            dist=`echo "${{ github.ref }}" | sed -e 's|\.pip\.branch$||' -e 's|refs/heads/.*\.||'`;;
+          esac
+          case $dist in
+          el7) distro=centos7;;
+          el8) distro=centos8;;
+          *)   distro=;;
+          esac
+          case $distro in
+          '') distros='[ "" ]'
+              gdb_ref=${{ github.ref }}
+              dispatch=true
+              ;;
+          *)  distros='[ "'$distro'" ]'
+              gdb_ref=''
+              dispatch=false
+          esac
+          echo "::set-output name=distros::${distros}"
+          echo "::set-output name=gdb_ref::${gdb_ref}"
+          echo "::set-output name=dispatch::${dispatch}"
+
+      - name: dispatch event
+        uses: peter-evans/repository-dispatch@v1
+        with:
+          token: ${{ secrets.PIP_BUILD_TOKEN }}
+          repository: ${{ github.repository }}
+          event-type: pip-gdb-update
+          client-payload: '{ "distros": ${{ steps.distros.outputs.distros }}, "archs": [ "amd64", "arm64" ], "pip_versions": [ "2", "3" ], "gdb_ref": "${{ steps.distros.outputs.gdb_ref }}", "dispatch": ${{ steps.distros.outputs.dispatch }} }'
