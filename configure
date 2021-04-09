@@ -1587,7 +1587,7 @@ Optional Packages:
   --with-isl-include=PATH Specify directory for installed isl include files
   --with-isl-lib=PATH     Specify the directory for the installed isl library
   --with-glibc-libdir[=DIR]
-                          specify glibc lib directory
+                          (not used)
   --with-pip[=DIR]        specify prefix directory for the installed PiP
                           package
   --with-target-bdw-gc=PATHLIST
