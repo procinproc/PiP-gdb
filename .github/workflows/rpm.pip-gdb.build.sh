@@ -1,6 +1,11 @@
 #!/bin/sh
 
 set -x
+
+# installation error may be ok
+yum -y install python-devel
+yum -y install texinfo-tex texlive-ec texlive-cm-super
+
 yum -y install rpmdevtools &&
 rpmdev-setuptree &&
 rpm -Uvh $RPM_SRPM &&
