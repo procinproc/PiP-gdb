@@ -60,20 +60,19 @@ jobs:
           esac
           git fetch origin ${base_branch}
           git diff origin/${base_branch} ${pip_branch} >/tmp/${patch}
-          cd releng
           mv /tmp/${patch} ./
-          docker run -v $(pwd):/host -e "RPM_BASE_SRPM=${base_srpm}" -e "RPM_PATCH=/host/${patch}" -e 'RPM_SPEC=/host/pip-gdb.spec' -e 'RPM_RESULTS=/host/srpm' ${{ secrets.DOCKERHUB_USER }}/pip-prep:${distro} /host/docker/pip-gdb-rpm/source.sh
+          docker run -v $(pwd):/host -e "RPM_BASE_SRPM=${base_srpm}" -e "RPM_PATCH=/host/${patch}" -e 'RPM_SPEC=/host/releng/pip-gdb.spec' -e 'RPM_RESULTS=/host/srpm' ${{ secrets.DOCKERHUB_USER }}/pip-prep:${distro} /host/.github/workflows/rpm.pip-gdb.source.sh
 
       - name: Display generated SRPMs
-        run: ls -lR releng/srpm
+        run: ls -lR srpm
 
       - name: upload SRPM
         uses: actions/upload-artifact@v2
         with:
           name: pip-${{ matrix.pip_version }}-gdb-${{ matrix.distro }}-srpm
           path: |
-            releng/srpm
-            releng/docker/pip-gdb-rpm
+            srpm
+            .github/workflows
 
   build:
 
@@ -104,7 +103,7 @@ jobs:
       - name: create RPM
         run: |
           set -x
-          docker run -v $(pwd):/host -e "RPM_SRPM=/host/srpm/*" -e 'RPM_SPEC=pip-gdb.spec' -e 'RPM_RESULTS=/host/rpm' ${{ secrets.DOCKERHUB_USER }}/pip-glibc-libpip:${{ matrix.pip_version }}.HEAD-${{ matrix.distro }}-${{ matrix.arch }} /bin/sh -x /host/docker/pip-gdb-rpm/build.sh
+          docker run -v $(pwd):/host -e "RPM_SRPM=/host/srpm/*" -e 'RPM_SPEC=pip-gdb.spec' -e 'RPM_RESULTS=/host/rpm' -e 'PIP_MAJOR_VERSION=${{ matrix.pip_version }}' ${{ secrets.DOCKERHUB_USER }}/pip-glibc-libpip:${{ matrix.pip_version }}.HEAD-${{ matrix.distro }}-${{ matrix.arch }} /bin/sh -x /host/.github/workflows/rpm.pip-gdb.build.sh
 
       - name: Display generated RPMs
         run: ls -lR rpm
@@ -148,4 +147,4 @@ jobs:
           token: ${{ secrets.PIP_BUILD_TOKEN }}
           repository: ${{ matrix.repo }}
           event-type: pip-gdb-rpm-built
-          client-payload: '{ "distros": ${{ toJSON(github.event.client_payload.distros) }}, "archtypes": ${{ steps.archtypes.outputs.archtypes }}, "pip_versions": ${{ toJSON(github.event.client_payload.pip_versions) }} }'
+          client-payload: '{ "distros": ${{ toJSON(github.event.client_payload.distros) }}, "archtypes": ${{ steps.archtypes.outputs.archtypes }}, "pip_versions": ${{ toJSON(github.event.client_payload.pip_versions) }}, "pip_minor_version": ".HEAD" }'

@@ -2,12 +2,15 @@
 #
 #	$ rpm -Uvh gdb-8.2-12.el8.src.rpm
 #	$ cd .../$SOMEWHERE/.../PiP-gdb
-#	$ git diff origin/centos/gdb-8.2-12.el8.branch centos/gdb-8.2-12.el8.pip.branch >~/rpmbuild/SOURCES/gdb-el8-pip3.patch
-#	$ rpmbuild -bb pip-gdb.spec
+#	$ git diff origin/centos/gdb-8.2-12.el8.branch centos/gdb-8.2-12.el8.pip.branch >~/rpmbuild/SOURCES/gdb-el8-%{pip_gdb_release}.patch
+#	$ rpmbuild --define 'pip_major_version 2' -bb pip-gdb.spec
 #
 
 %define	pip_gdb_release		pip3
-%define pip_prefix		/usr/local
+%if %{undefined pip_major_version}
+%define pip_major_version	2
+%endif
+%define pip_prefix		/opt/process-in-process/pip-%{pip_major_version}
 %define scl_prefix		pip-
 
 # rpmbuild parameters:
@@ -202,7 +205,7 @@ Source8: _gdb.spec.Patch.include
 Source9: _gdb.spec.patch.include
 %include %{SOURCE8}
 
-Patch9999: gdb-el8-pip3.patch
+Patch9999: gdb-el8-%{pip_gdb_release}.patch
 
 %if 0%{!?rhel:1} || 0%{?rhel} > 6
 # RL_STATE_FEDORA_GDB would not be found for:
@@ -251,7 +254,9 @@ BuildRequires: guile-devel%{buildisa}
 %if 0%{?el7:1} && 0%{?scl:1}
 BuildRequires: cmake
 %else
-BuildRequires: libipt-devel%{buildisa}
+## patch for PiP-gdb
+## it seems libipt-devel is not publicly distributed, and not mandatory
+# BuildRequires: libipt-devel%{buildisa}
 %endif
 %endif
 %endif
@@ -481,6 +486,7 @@ rm -rf readline/*
 %build
 rm -rf %{buildroot}
 
+# use _prefix=/usr by default to share configuration files with original gdb
 DESTDIR="$RPM_BUILD_ROOT" sh ./build.sh -b \
 	--prefix=%{_prefix} \
 	--with-pip=%{pip_prefix}
