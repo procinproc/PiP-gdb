@@ -2,12 +2,15 @@
 #
 #	$ rpm -Uvh gdb-7.6.1-94.el7.src.rpm
 #	$ cd .../$SOMEWHERE/.../PiP-gdb
-#	$ git diff origin/centos/7.6.1-94.el7-branch pip-centos7 >~/rpmbuild/SOURCES/gdb-pip.patch
-#	$ rpmbuild -bb ~/rpmbuild/SPECS/pip-gdb.spec
+#	$ git diff origin/centos/gdb-7.6.1-94.el7.branch centos/gdb-7.6.1-94.el7.pip.branch >~/rpmbuild/SOURCES/gdb-el7-%{pip_gdb_release}.patch
+#	$ rpmbuild --define 'pip_major_version 2' -bb pip-gdb.spec
 #
 
-%define	pip_gdb_release		pip1
-%define pip_glibc_libdir	/opt/pip/lib
+%define	pip_gdb_release		pip3
+%if %{undefined pip_major_version}
+%define pip_major_version	2
+%endif
+%define pip_prefix		/opt/process-in-process/pip-%{pip_major_version}
 %define scl_prefix		pip-
 
 # rpmbuild parameters:
@@ -848,7 +851,7 @@ Patch992: gdb-rhbz1350436-type-printers-error.patch
 # (Andrew Pinski, RH BZ 1363635).
 Patch1141: gdb-rhbz1363635-aarch64-armv8182.patch
 
-Patch9999: gdb-pip.patch
+Patch9999: gdb-el7-%{pip_gdb_release}.patch
 
 %if 0%{!?rhel:1} || 0%{?rhel} > 6
 # RL_STATE_FEDORA_GDB would not be found for:
@@ -1363,8 +1366,7 @@ rm -rf readline/*
 
 DESTDIR="$RPM_BUILD_ROOT" sh ./build.sh -b \
 	--prefix=%{_prefix} \
-	--with-glibc-libdir=%{pip_glibc_libdir} \
-	--with-pip=%{_prefix}
+	--with-pip=%{pip_prefix}
 
 %install
 
