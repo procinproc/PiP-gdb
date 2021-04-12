@@ -1,0 +1,43 @@
+name: create pip-glibc-libpip-gdb Docker image
+
+on:
+
+  workflow_dispatch:
+
+    inputs:
+
+      distros:
+        description: 'distribtions to create the images'
+        required: true
+        default: '[ "centos7", "centos8" ]'
+
+      archtypes:
+        description: 'architecture types of the images'
+        required: true
+        default: '[ "multiarch", "amd64", "arm64" ]'
+
+      pip_versions:
+        description: 'PiP versions of the images'
+        required: true
+        default: '[ "2", "3" ]'
+
+      pip_minor_version:
+        description: 'PiP minor version of the images'
+        required: false
+        default: '.HEAD'
+
+jobs:
+
+  dispatch:
+
+    runs-on: ubuntu-latest
+
+    steps:
+
+      - name: dispatch event
+        uses: peter-evans/repository-dispatch@v1
+        with:
+          token: ${{ secrets.PIP_BUILD_TOKEN }}
+          repository: ${{ github.repository }}
+          event-type: pip-gdb-docker-invoke
+          client-payload: '{ "distros": ${{ github.event.inputs.distros }}, "archtypes": ${{ github.event.inputs.archtypes }}, "pip_versions": ${{ github.event.inputs.pip_versions }}, "pip_minor_version": "${{ github.event.inputs.pip_minor_version }}" }'
