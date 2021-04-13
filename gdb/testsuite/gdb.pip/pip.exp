@@ -54,7 +54,7 @@ set rootpid [eval exec $binfile &]
 exec sleep 5
 
 #set taskpid [ exec ps -axw | grep $binfile | gawk "{ if (\$1 != $rootpid && \$5 == \"$binfile\" ) pid=\$1 } END { print pid }" ]
-set taskpid [ exec ${pips} --family --task $rootpid | gawk "{ pid=\$1 } END { print pid }" ]
+set taskpid [ exec ${pips} x --family --task $rootpid | gawk "{ pid=\$1 } END { print pid }" ]
 
 set use_gdb_stub 0
 set timeout 120
