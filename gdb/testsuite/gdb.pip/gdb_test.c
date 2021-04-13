@@ -39,8 +39,6 @@
 #define TESTINT(F)		\
   do{int __xyz=(F); if(__xyz){PRINT_FL(#F,__xyz);_exit(9);}} while(0)
 
-int root_exp = 0;
-
 void *thread1(void *args)
 {
   int inf = 1;
@@ -61,7 +59,6 @@ void *thread2(void *args)
 
 int main( int argc, char **argv ) {
   int pipid, ntasks;
-  int i;
   int err;
   int retval;
   pthread_t t1, t2;
@@ -70,7 +67,6 @@ int main( int argc, char **argv ) {
   TESTINT( pip_init( &pipid, &ntasks, NULL, 0 ) );
 
   if( pipid == PIP_PIPID_ROOT ) {
-    root_exp = 1;
     char *sleep_argv[] = {
 	    "./gdb.pip/sleep",
 	    NULL,
@@ -81,21 +77,20 @@ int main( int argc, char **argv ) {
     pthread_create(&t2, NULL, thread2, (void *)NULL);
 
     DBGF( "spawning pip tasks" );
-    i = 0;
     pipid = 0;
-    err = pip_spawn( sleep_argv[0], sleep_argv, NULL, i%4, &pipid, NULL, NULL, NULL );
+    err = pip_spawn( sleep_argv[0], sleep_argv, NULL, 0, &pipid, NULL, NULL, NULL );
     if( err ) {
-      fprintf( stderr, "pip_spawn(%d!=%d)=%d !!!!!!\n", i, pipid, err );
+      fprintf( stderr, "pip_spawn(%d)=%d !!!!!!\n", pipid, err );
     }
 
     DBGF( "waiting for pthread terminations" );
     pthread_join(t1, NULL);
     pthread_join(t2, NULL);
 
-    DBGF( "calling pip_wait(%d)", i );
-    TESTINT( pip_wait( i, &retval ) );
-    if( retval != i ) {
-      fprintf( stderr, "[PIPID=%d] pip_wait() returns %d ???\n", i, retval );
+    DBGF( "calling pip_wait()" );
+    TESTINT( pip_wait( pipid, &retval ) );
+    if( retval != 0 ) {
+      fprintf( stderr, "[PIPID=%d] pip_wait() returns %d ???\n", pipid, retval );
     } else {
       fprintf( stderr, " terminated. OK\n" );
     }
@@ -103,7 +98,6 @@ int main( int argc, char **argv ) {
     TESTINT( pip_fin() );
 
   } else {
-    root_exp = 999;
     fprintf( stderr, "Hello, I am PIPID[%d] ...", pipid );
     sleep(120);
     pip_exit( pipid );
