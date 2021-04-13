@@ -1682,7 +1682,7 @@ AC_SUBST(islinc)
 # just ignore --with-glibc-libdir
 AC_ARG_WITH([glibc-libdir],
   [AS_HELP_STRING([--with-glibc-libdir@<:@=DIR@:>@],
-                  [specify glibc lib directory])])
+                  [(not used)])])
 
 AC_MSG_CHECKING([for PiP])
 AC_ARG_WITH([pip],
