@@ -213,7 +213,7 @@ esac
 
 : ${BUILD_PARALLELISM=`getconf _NPROCESSORS_ONLN`}
 : ${EXTRA_CONFIGURE_OPTIONS="${opt_werror} ${opt_with_rpm} ${opt_inprocess_agent} --enable-targets=s390-linux-gnu,powerpc-linux-gnu,powerpcle-linux-gnu"}
-: ${EXTRA_GCC_OPTIONS="-fstack-protector-strong -grecord-gcc-switches"}
+: ${EXTRA_GCC_OPTIONS="-fstack-protector-strong -grecord-gcc-switches -Wno-deprecated-declarations"}
 
 if [ x"${build_parallelism}" != x ]; then
     BUILD_PARALLELISM=${build_parallelism}
