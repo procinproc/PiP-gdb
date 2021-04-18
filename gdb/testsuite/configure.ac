@@ -94,7 +94,7 @@ elif test -x "${with_pip}/bin/pipcc"; then
   pip_site_exp="\\
 proc skip_pip_tests {} { return 0; }|\\
 set pipcc_flags \\\"${pipcc_flags}\\\"|\\
-set pip_unpie \\\"${with_pip}/bin/pip_unpie\\\"|\\
+set pip_unpie \\\"${with_pip}/bin/pip-unpie\\\"|\\
 set pips \\\"${with_pip}/bin/pips\\\""
 else
   AC_MSG_ERROR([can't find "${with_pip}/bin/pipcc"])
