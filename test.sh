@@ -1,5 +1,16 @@
 #!/bin/sh
 
+if [ x"$CC" = x ]; then
+    CC=cc
+fi
+if ! $CC check_ptrace.c -o check_ptrace > /dev/null 2>&1 || 
+    ! ./check_ptrace; then
+    echo "Failed to call ptrace() and PiP-gdb test is skipped"
+    rm -f check_ptrace
+    exit 0
+fi
+rm -f check_ptrace
+
 if ! which runtest >/dev/null 2>&1; then
     echo >&2 "DejaGnu seems not installed and PiP-gdb test is skipped"
     exit 0
