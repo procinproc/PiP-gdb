@@ -64,7 +64,7 @@ Group: Development/Debuggers
 # ftp://sourceware.org/pub/gdb/releases/gdb-%{version}.tar.bz2
 Source: ftp://sourceware.org/pub/gdb/releases/gdb-%{version}.tar.bz2
 Buildroot: %(mktemp -ud %{_tmppath}/%{name}-%{version}-%{release}-XXXXXX)
-BuildRequires: pip
+BuildRequires: process-in-process
 URL: http://gnu.org/software/gdb/
 
 %if "%{scl}" == "devtoolset-1.1"
