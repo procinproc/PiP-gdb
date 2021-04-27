@@ -50,6 +50,7 @@ Group: Development/Debuggers
 # ftp://sourceware.org/pub/gdb/releases/FIXME{tarname}.tar.xz
 #Source: %{tarname}.tar.xz
 Source: ftp://sourceware.org/pub/gdb/releases/%{tarname}.tar.xz
+BuildRequires: process-in-process
 URL: http://gnu.org/software/gdb/
 
 # For our convenience
