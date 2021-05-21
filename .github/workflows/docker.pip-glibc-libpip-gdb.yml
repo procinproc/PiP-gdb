@@ -70,7 +70,7 @@ jobs:
           file: releng/docker/Dockerfile
           tags: ${{ secrets.DOCKERHUB_USER }}/pip-glibc-libpip-gdb:${{ steps.docker-config.outputs.tag }}
           build-args: |
-             DOCKER_BASE=${{ secrets.DOCKERHUB_USER }}/pip-glibc-libpip:${{ matrix.pip_version }}${{ github.event.client_payload.pip_minor_version }}-${{ matrix.distro }}
+             DOCKER_BASE=${{ secrets.DOCKERHUB_USER }}/pip-glibc-libpip:${{ matrix.pip_version }}.HEAD-${{ matrix.distro }}
              PIP_VERSION=${{ matrix.pip_version }}
              DISTRO=${{ matrix.distro }}
              GITHUB_REPOSITORY=${{ github.repository }}
@@ -112,12 +112,12 @@ jobs:
             archs="${archs}]"
           fi
           echo "distros=<${{ github.event.client_payload.distros }}>"
-          echo "distros=<${{ toJSON(github.event.client_payload.distros) }}>"
+          echo "toJSON(distros)=<${{ toJSON(github.event.client_payload.distros) }}>"
           echo "archtypes=<${{ github.event.client_payload.archtypes }}>"
           echo "toJSON(archtypes)=<${{ toJSON(github.event.client_payload.archtypes) }}>"
           echo "::set-output name=archs::${archs}"
           echo "pip_versions=<${{ github.event.client_payload.pip_versions }}>"
-          echo "pip_versions=<${{ toJSON(github.event.client_payload.pip_versions) }}>"
+          echo "toJSON(pip_versions)=<${{ toJSON(github.event.client_payload.pip_versions) }}>"
 
       - name: dispatch event
         uses: peter-evans/repository-dispatch@v1
