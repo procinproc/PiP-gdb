@@ -28,11 +28,12 @@ jobs:
           case $distro in
           '') distros='[ "" ]'
               gdb_ref=${{ github.ref }}
-              dispatch=true
+              dispatch=false
               ;;
           *)  distros='[ "'$distro'" ]'
               gdb_ref=''
-              dispatch=false
+              dispatch=true
+              ;;
           esac
           echo "::set-output name=distros::${distros}"
           echo "::set-output name=gdb_ref::${gdb_ref}"
