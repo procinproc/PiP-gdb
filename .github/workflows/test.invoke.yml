@@ -45,4 +45,4 @@ jobs:
           token: ${{ secrets.PIP_BUILD_TOKEN }}
           repository: ${{ github.repository }}
           event-type: pip-gdb-test-invoke
-          client-payload: '{ "distros": ${{ github.event.inputs.distros }}, "archs": ${{ github.event.inputs.archs }}, "pip_versions": ${{ github.event.inputs.pip_versions }}, "gdb_ref": "${{ github.event.inputs.gdb_ref }}", "dispatch": "${{ github.event.inputs.dispatch }}" }'
+          client-payload: '{ "distros": ${{ github.event.inputs.distros }}, "archs": ${{ github.event.inputs.archs }}, "pip_versions": ${{ github.event.inputs.pip_versions }}, "gdb_ref": "${{ github.event.inputs.gdb_ref }}", "dispatch": ${{ github.event.inputs.dispatch }} }'
