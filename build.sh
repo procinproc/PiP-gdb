@@ -21,6 +21,8 @@
 opt_with_rpm_default="--without-rpm"
 opt_with_expat_default="--without-expat"
 
+echo $0 $@ > .build.cmd
+
 self=`basename $0`
 
 rm -f ${build_log}
@@ -250,6 +252,7 @@ if $do_build; then
 		--with-auto-load-safe-path='$debugdir:$datadir/auto-load:/usr/bin/mono-gdb.py' \
 		${EXTRA_CONFIGURE_OPTIONS} \
 		--prefix=${installdir} ${program_prefix} \
+	        --datarootdir=${installdir}/share.pip-gdb \
 	        ${with_pip} \
 		${host} \
 	    &&
