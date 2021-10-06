@@ -228,7 +228,6 @@ fi
 set -x
 
 if $do_build; then
-
 	if $do_clean; then
 		make clean || true
 		make distclean || true
