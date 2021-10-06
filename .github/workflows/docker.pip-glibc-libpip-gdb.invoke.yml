@@ -24,7 +24,7 @@ on:
       pip_minor_version:
         description: 'PiP minor version of the images'
         required: false
-        default: '.HEAD'
+        default: ''
 
 jobs:
 
