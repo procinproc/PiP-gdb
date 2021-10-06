@@ -21,9 +21,9 @@
 opt_with_rpm_default="--without-rpm"
 opt_with_expat_default="--without-expat"
 
-self=`basename $0`
-
 echo $0 $@ > .build.cmd
+
+self=`basename $0`
 
 rm -f ${build_log}
 
@@ -87,7 +87,23 @@ case ${ldlinux} in
     *) :;;
 esac
 
-if $do_check; then
+if ! ${do_check}; then
+    if [ x"${installdir}" == x -o x"${with_pip}" == x ]; then
+	usage;
+    fi
+    pipdir=`expr "${with_pip}" : "--with-pip=\(.*\)"`;
+    if ! [ -x ${pipdir}/lib/libpip.so ]; then
+	echo >&2 "${pipdir} seems not to be PiP directory"
+    fi
+    ldlinux=`${pipdir}/lib/libpip.so --ldlinux`
+    case ${ldlinux} in
+	/lib/ld-*|/lib64/ld-*|/usr/lib/ld-*|/usr/lib64/ld-*)
+	    echo >&2 -n "$self: Looks like the specified PiP lib (${pipdir}) is not configured ";
+	    echo >&2 "to use the patched PiP-glibc and PiP-gdb cannot work without PiP-glibc";
+	    exit 1;;
+	*) :;;
+    esac
+else
     if [ x"${packages}" != x ]; then
 	echo >&2 "$self: '--missing' and '--packages' cannot be specified at once"
 	exit 1
@@ -230,8 +246,8 @@ set -x
 
 if $do_build; then
 	if $do_clean; then
-		make clean
-		make distclean
+		make clean || true
+		make distclean || true
 		find . -name config.cache -delete
 	fi
 
@@ -252,6 +268,7 @@ if $do_build; then
 		--with-auto-load-safe-path='$debugdir:$datadir/auto-load:/usr/bin/mono-gdb.py' \
 		${EXTRA_CONFIGURE_OPTIONS} \
 		--prefix=${installdir} ${program_prefix} \
+	        --datarootdir=${installdir}/share.pip-gdb \
 	        ${with_pip} \
 		${host} \
 	    &&
