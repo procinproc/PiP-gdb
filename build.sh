@@ -137,7 +137,7 @@ if ! [ -x ${instdir}/bin/makeinfo ]; then
     if ! $do_check; then
 	echo >&2 "$self: seems not to be installed"
     else
-	echo "texinfo https://ftp.gnu.org/gnu/texinfo/texinfo-6.5.tar.gz"
+	echo "texinfo https://ftp.gnu.org/gnu/texinfo/texinfo-6.8.tar.gz"
     fi
 else
     echo >&2 "OK"
@@ -162,7 +162,7 @@ if ! [ -f ${instdir}/include/readline/readline.h ]; then
     if ! $do_check; then
 	echo >&2 "seems not to be installed"
     else
-	echo "readline https://ftp.gnu.org/gnu/readline/readline-7.0.tar.gz"
+	echo "readline https://ftp.gnu.org/gnu/readline/readline-8.1.tar.gz"
     fi
 else
     echo >&2 "OK"
