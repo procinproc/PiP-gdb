@@ -76,7 +76,7 @@ if ! ${do_check}; then
     fi
     pipdir=`expr "${with_pip}" : "--with-pip=\(.*\)"`;
     if ! [ -x ${pipdir}/lib/libpip.so ]; then
-	echo >&2 "${pipdir} seems not to be PiP directory"
+	echo >&2 "$self: ${pipdir} seems not to be PiP directory"
     fi
     ldlinux=`${pipdir}/lib/libpip.so --ldlinux`
     case ${ldlinux} in
@@ -121,7 +121,30 @@ build_flags () {
 
 pkgfail=false;
 
-echo >&2 -n "Checking texinfo .. "
+echo >&2 "$self: Checking required packages ... "
+centos_version=`cut -d ' ' -f 4 /etc/redhat-release`;
+case $centos_version in
+    7.*) pkgs_needed="gd-devel libpng-devel zlib-devel libselinux-devel audit-libs-devel libcap-devel nss-devel systemtap-sdt-devel libstdc++-static glibc-static ncurses-devel xz-devel rpm-devel expat-devel python-devel texinfo-tex texlive-ec texlive-cm-super dejagnu perl";;
+    8.*) pkgs_needed="gd-devel libpng-devel zlib-devel libselinux-devel audit-libs-devel libcap-devel nss-devel systemtap-sdt-devel ncurses-devel xz-devel rpm-devel expat-devel python3-debug info texlive perl";;
+esac
+
+if ! sudo true; then
+    for pkgn in $pkgs_needed; do
+	if ! yum list installed $pkgn >/dev/null 2>&1; then
+	    pkgfail=true;
+	    echo >&2 "$self: '$pkgn' package is not installed"
+	fi
+    done
+else
+    for pkgn in $pkgs_needed; do
+	if ! sudo yum install -y $pkgn >/dev/null 2>&1; then
+	    pkgfail=true;
+	    echo >&2 "$self: 'yum install $pkgn' failed"
+	fi
+    done
+fi    
+
+echo >&2 -n "Checking texinfo ... "
 instdir=/usr
 flag_installed=false
 for pkg in $packages; do
@@ -135,7 +158,7 @@ done
 if ! [ -x ${instdir}/bin/makeinfo ]; then
     pkgfail=true
     if ! $do_check; then
-	echo >&2 "$self: seems not to be installed"
+	echo >&2 "$self: 'makeinfo' seems not to be installed"
     else
 	echo "texinfo https://ftp.gnu.org/gnu/texinfo/texinfo-6.8.tar.gz"
     fi
@@ -146,7 +169,7 @@ else
     fi
 fi
 
-echo >&2 -n "Checking readline .. "
+echo >&2 -n "Checking readline ... "
 instdir=/usr
 flag_installed=false
 for pkg in $packages; do
@@ -160,7 +183,7 @@ done
 if ! [ -f ${instdir}/include/readline/readline.h ]; then
     pkgfail=true
     if ! $do_check; then
-	echo >&2 "seems not to be installed"
+	echo >&2 "$self 'readline' seems not to be installed"
     else
 	echo "readline https://ftp.gnu.org/gnu/readline/readline-8.1.tar.gz"
     fi
@@ -171,26 +194,12 @@ else
     fi
 fi
 
-echo >&2 "Checking other required packages ... "
-centos_version=`cut -d ' ' -f 4 /etc/redhat-release`;
-case $centos_version in
-    7.*) pkgs_needed="gd-devel libpng-devel zlib-devel libselinux-devel audit-libs-devel libcap-devel nss-devel systemtap-sdt-devel libstdc++-static glibc-static ncurses-devel xz-devel rpm-devel expat-devel python-devel texinfo-tex texlive-ec texlive-cm-super dejagnu";;
-    8.*) pkgs_needed="gd-devel libpng-devel zlib-devel libselinux-devel audit-libs-devel libcap-devel nss-devel systemtap-sdt-devel ncurses-devel xz-devel rpm-devel expat-devel python36-debug info texlive";;
-esac
-
-for pkgn in $pkgs_needed; do
-    if ! yum list installed $pkgn >/dev/null 2>&1; then
-	pkgfail=true;
-	echo >&2 "'$pkgn' package is not installed"
-    fi
-done
-
 if $do_check; then
     exit 0
 elif $pkgfail ; then
-    echo >&2 "WARNING: Some packages are missing and installation might be failed"
+    echo >&2 "$self:WARNING: Some packages are missing and installation might be failed"
 else
-    echo >&2 "All required packages found"
+    echo >&2 "$self: All required packages found"
 fi
 
 case `uname -m` in
