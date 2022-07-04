@@ -124,11 +124,12 @@ pkgfail=false;
 echo >&2 "$self: Checking required packages ... "
 centos_version=`cut -d ' ' -f 4 /etc/redhat-release`;
 case $centos_version in
-    7.*) pkgs_needed="gd-devel libpng-devel zlib-devel libselinux-devel audit-libs-devel libcap-devel nss-devel systemtap-sdt-devel libstdc++-static glibc-static ncurses-devel xz-devel rpm-devel expat-devel python-devel texinfo-tex texlive-ec texlive-cm-super dejagnu perl";;
-    8.*) pkgs_needed="gd-devel libpng-devel zlib-devel libselinux-devel audit-libs-devel libcap-devel nss-devel systemtap-sdt-devel ncurses-devel xz-devel rpm-devel expat-devel python3-debug info texlive perl";;
+    7.*) pkgs_needed="gd-devel libpng-devel zlib-devel libselinux-devel audit-libs-devel libcap-devel nss-devel systemtap-sdt-devel libstdc++-static glibc-static ncurses-devel xz-devel rpm-devel expat-devel python-devel texinfo-tex texlive-ec texlive-cm-super dejagnu perl readline-devel";;
+    8.*) pkgs_needed="gd-devel libpng-devel zlib-devel libselinux-devel audit-libs-devel libcap-devel nss-devel systemtap-sdt-devel ncurses-devel xz-devel rpm-devel expat-devel python3-debug info texlive perl flex readline-devel";;
 esac
 
 if ! sudo true; then
+    echo >&2 "$self: sudo is diabled and unable to install missed packages"
     for pkgn in $pkgs_needed; do
 	if ! yum list installed $pkgn >/dev/null 2>&1; then
 	    pkgfail=true;
@@ -137,6 +138,7 @@ if ! sudo true; then
     done
 else
     for pkgn in $pkgs_needed; do
+	echo >&2 "$self: yum install $pkgn"
 	if ! sudo yum install -y $pkgn >/dev/null 2>&1; then
 	    pkgfail=true;
 	    echo >&2 "$self: 'yum install $pkgn' failed"
